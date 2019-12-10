@@ -114,7 +114,7 @@ private:
         inline double x() { return p.x(); };
         inline double y() { return p.y(); };
     };
-    std::vector<TSite> s;                                                       // The final coordinates of points.
+    std::vector<TSite> sites;                                                       // The final coordinates of points.
     inline double toroidallinearDist(double x1, double x2) const {              // 1D Nearest distance between replicas of two points
         double dx = x1 - x2;                                                    // Find distance in primary period
         while (dx > HALF) dx -= ONE;                                            // If larger than half the period length another replica is certainly nearer
@@ -150,7 +150,7 @@ private:
 
     inline void moveSite(int index, Vector shift) {                             // A handy function to shift points relative to their current location
         if (shift.squared_length() > epsilon) {
-            moveSite(index, s[index].p + shift);
+            moveSite(index, sites[index].p + shift);
         }
     };
     // Relaxation forces:
@@ -190,7 +190,7 @@ public:
     double getMaxShift() { return sqrt(maxShift); }
     Statistics GetStatistics();
     void setAllUnstable() {
-        for (int i = 0; i < n; i++) s[i].isStable = false;
+        for (int i = 0; i < n; i++) sites[i].isStable = false;
         allStable = false;
     }
 
@@ -206,14 +206,14 @@ CPointSet::CPointSet(int number_of_points, int initType) {
     //HALF = 0.5;
     outputPath = "";
 
-    n = number_of_points;                                                   // Number of points in one period
+    n = number_of_points;                                                     // Number of points in one period
     ONE = sqrt(n);
     HALF = 0.5 * ONE;
     dhex = ONE * sqrt(2 / (sqrt(3) * n));                                     // Maximum packing distance
     double margin = std::min(10 / sqrt(n), 1.0);                              // Margin for toroidal domain. Heuristically, use 10 layers of points.
-    marginBL = Point(-margin * ONE, -margin * ONE);                              // Bottom-left of primary period + margin
-    marginTR = Point((1 + margin) * ONE, (1 + margin) * ONE);                        // Top-right. In our convention BL is included, TR is excluded
-    s.reserve(n);                                                           // The final location including shifts
+    marginBL = Point(-margin * ONE, -margin * ONE);                           // Bottom-left of primary period + margin
+    marginTR = Point((1 + margin) * ONE, (1 + margin) * ONE);                 // Top-right. In our convention BL is included, TR is excluded
+    sites.resize(n);                                                          // The final location including shifts
     switch (initType) {
     case 0: initRandom(); break;
     case 1: initDarts(); break;
@@ -230,7 +230,7 @@ void CPointSet::getPoints(double* outMatrix)
 {
     for (int row = 0; row < n; row++)
     {
-        Point p = normalize(s[row].p); // Normalize and wrap back to unit torus
+        Point p = normalize(sites[row].p); // Normalize and wrap back to unit torus
 
         outMatrix[row] = p.x();
         outMatrix[n + row] = p.y();
@@ -262,7 +262,7 @@ void CPointSet::initDarts() {
             accepted = true;
             int counter = 0;
             for (int j = 0; (j < i) && accepted; j++) {
-                accepted = accepted && (toroidalSqDist(p, s[j].p) > rr);
+                accepted = accepted && (toroidalSqDist(p, sites[j].p) > rr);
             }
             if (counter++ >= MAX) {
                 fprintf(stderr, "Darts failed at %d\n", i);
@@ -300,7 +300,7 @@ void CPointSet::initGrid() {
 Vector CPointSet::centroid(int index) {                                         // See http://en.wikipedia.org/wiki/Centroid
     double a = 0, cx = 0, cy = 0;                                               // Cell area (actually twice the area) and centroid coordinates
     double XProduct;                                                            // Cross product of vectors to adjacent vertices
-    FC fc = dt.incident_faces(s[index].vh[0]), done(fc);
+    FC fc = dt.incident_faces(sites[index].vh[0]), done(fc);
     do {
         Point p1 = dt.circumcenter(fc);
         Point p2 = dt.circumcenter(++fc);
@@ -311,35 +311,35 @@ Vector CPointSet::centroid(int index) {                                         
     } while (fc != done);
     cx /= 3.0 * a;
     cy /= 3.0 * a;
-    return Point(cx, cy) - s[index].p;                                          // Return shift from current position to centroid
+    return Point(cx, cy) - sites[index].p;                                          // Return shift from current position to centroid
 };
 
 Point CPointSet::setSite(int index, Point p) {                                         // Set location of the indexed point (in t-domain) and insert it in triangulation
     p = mainReplica(p);
-    s[index].p = p;                                                         // Save a handy copy of point coordinates
-    s[index].isStable = false;
+    sites[index].p = p;                                                         // Save a handy copy of point coordinates
+    sites[index].isStable = false;
     for (int i = 0; i < 9; i++) {                                           // We loop through the 9 replicas,
         if (isInRect(replica(p, i), marginBL, marginTR)) {                  // if the location of a replica is within margin
-            s[index].vh[i] = dt.insert(replica(p, i));                      // insert replica in triangulation and keep handle to it
-            s[index].vh[i]->info().id = index;                              // Point the DT point back to map entry
+            sites[index].vh[i] = dt.insert(replica(p, i));                      // insert replica in triangulation and keep handle to it
+            sites[index].vh[i]->info().id = index;                              // Point the DT point back to map entry
         }
-        else s[index].vh[i] = NULL;
+        else sites[index].vh[i] = NULL;
     }
     return p;
 };
 
 void CPointSet::moveSite(int index, Point p) {                                         // Adjust location of indexed point (in t-domain) and update in triangulation
-    double l = (p - s[index].p).squared_length();
+    double l = (p - sites[index].p).squared_length();
     maxShift = std::max(maxShift, l);
-    s[index].p = p;                                                         // Save a handy copy of updated point coordinates
+    sites[index].p = p;                                                         // Save a handy copy of updated point coordinates
     for (int i = 0; i < 9; i++) {
-        if (s[index].vh[i] != NULL)
-            s[index].vh[i] = dt.move(s[index].vh[i], replica(p, i));
+        if (sites[index].vh[i] != NULL)
+            sites[index].vh[i] = dt.move(sites[index].vh[i], replica(p, i));
     }
-    s[index].becomeStable = false;                                          // Mark the point instable
-    VC vc = dt.incident_vertices(s[index].vh[0]), done(vc);
+    sites[index].becomeStable = false;                                          // Mark the point instable
+    VC vc = dt.incident_vertices(sites[index].vh[0]), done(vc);
     do {                                                                    // Mark neighbors instable
-        s[vc->info().id].becomeStable = false;
+        sites[vc->info().id].becomeStable = false;
     } while (++vc != done);
     allStable = false;                                                      // Mark the whole point set instable
 };
@@ -349,8 +349,8 @@ Vector CPointSet::capacitySerial(int i) {                                       
     double sum_w = 0;
     double a = 0;                                                               // Area of Voronoi cell
     double XProduct;
-    FC fc2 = dt.incident_faces(s[i].vh[0]), fc1(fc2++);                         // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
-    VC vc = dt.incident_vertices(s[i].vh[0], fc2), done(vc);                    // The vertex sharing fc1 anf fc2 with v[i].vh
+    FC fc2 = dt.incident_faces(sites[i].vh[0]), fc1(fc2++);                         // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
+    VC vc = dt.incident_vertices(sites[i].vh[0], fc2), done(vc);                    // The vertex sharing fc1 anf fc2 with v[i].vh
     int m = 0;                                                                  // Number of neighbors
     Vector dir[20];                                                             // Direction vectors to neighbors
     int id[20];                                                                 // Id's of neighbors. We can't use the circulator for updating
@@ -359,7 +359,7 @@ Vector CPointSet::capacitySerial(int i) {                                       
         XProduct = c1.x() * c2.y() - c1.y() * c2.x();
         a += XProduct;                                                          // Accumulate areas
         el[m] = sqrt((c2 - c1).squared_length());                               // Length of Voronoi edge
-        dir[m] = (vc->point() - s[i].p);
+        dir[m] = (vc->point() - sites[i].p);
         d[m] = sqrt(dir[m].squared_length());                                   // Distance to neighbor (= 2 x distance to Voronoi edge)
         dir[m] = dir[m] / d[m];                                                 // Normalize direction vector
         id[m] = vc->info().id;
@@ -385,12 +385,12 @@ Vector CPointSet::capacitySerial(int i) {                                       
 // test conflict resolution by pushing neighbors
 Vector CPointSet::conflict(int index) {
     double dmin = rel_dmin * dhex;
-    Point& p = s[index].p;
+    Point& p = sites[index].p;
     bool conflict[30];
     Vector shift[30];
     int id[30];
     int m = 0;
-    VC vc = dt.incident_vertices(s[index].vh[0]), done(vc);
+    VC vc = dt.incident_vertices(sites[index].vh[0]), done(vc);
     do {
         Vector edge = vc->point() - p;
         double l = VL(edge);
@@ -416,15 +416,15 @@ Vector CPointSet::coverage(int index) {                                        /
     double scale[30];
     Vector edge[30];
     int m = 0;
-    FC fc = dt.incident_faces(s[index].vh[0]), done(fc);
-    VC vc = dt.incident_vertices(s[index].vh[0], fc);
+    FC fc = dt.incident_faces(sites[index].vh[0]), done(fc);
+    VC vc = dt.incident_vertices(sites[index].vh[0], fc);
     do {
         vc++;
-        edge[m] = s[index].p - vc->point();
+        edge[m] = sites[index].p - vc->point();
         id[m] = vc->info().id;
         if (triangleType(fc) <= 0) {
             Point c = dt.circumcenter(fc);
-            double l = VL(c - s[index].p);
+            double l = VL(c - sites[index].p);
             scale[m] = rc / l;
         }
         else scale[m] = 2;                                                    // > 1
@@ -442,12 +442,12 @@ Vector CPointSet::coverage(int index) {                                        /
 
 double CPointSet::PPO_serial(std::string seq, double scale) {
     maxShift = 0;
-    for (int i = 0; i < n; i++) s[i].becomeStable = true;                       // Assume all points will be found stable.
+    for (int i = 0; i < n; i++) sites[i].becomeStable = true;                       // Assume all points will be found stable.
     allStable = true;                                                           // Assume the point set will be found stable.
     unsigned* order = shuffle(n);
     for (int i = 0; i < n; i++) {                                               // Iterate through numbers up to maximum index
         int index = order[i];                                                   // Translate index according to the random order
-        if (s[index].isStable) continue;                                        // Skip stable points
+        if (sites[index].isStable) continue;                                        // Skip stable points
         for (int k = 0; k < seq.length(); k++) {
             switch (seq[k]) {
             case '0': coverage(index); break;
@@ -459,8 +459,8 @@ double CPointSet::PPO_serial(std::string seq, double scale) {
     delete[] order;
     stableCount = 0;
     for (int i = 0; i < n; i++) {
-        s[i].isStable = s[i].becomeStable;
-        if (s[i].becomeStable) stableCount++;
+        sites[i].isStable = sites[i].becomeStable;
+        if (sites[i].becomeStable) stableCount++;
     }
     return sqrt(maxShift);                                                      // Return maximum shift which can be used to monitor convergence
 }
@@ -475,7 +475,7 @@ void CPointSet::printText(std::string fileName) {                               
     }
     fprintf(file, "%d\n", n);                                                   // Print number of points in first line; a common convention
     for (int i = 0; i < n; i++) {                                               // Loop through all points
-        Point p = normalize(s[i].p);                                            // Normalize and wrap back to unit torus
+        Point p = normalize(sites[i].p);                                            // Normalize and wrap back to unit torus
         fprintf(file, "%0.12f %0.12f\n", p.x(), p.y());
     }
     fclose(file);
@@ -491,14 +491,14 @@ Statistics CPointSet::GetStatistics() {                                        /
     for (int i = 0; i < n; i++) {
         double localmd = ONE;
         std::complex<double> localacc = 0;
-        VC vc = dt.incident_vertices(s[i].vh[0]),
+        VC vc = dt.incident_vertices(sites[i].vh[0]),
             done(vc), next;
         do {
             next = vc; ++next;
             const Point& v1 = vc->point();
             const Point& v2 = next->point();
             // Local mindist
-            double dist = CGAL::squared_distance(s[i].p, v1);
+            double dist = CGAL::squared_distance(sites[i].p, v1);
             localmd = std::min(localmd, (double)dist);
             // Orientational order
             std::complex<double> c1(v1.x(), v1.y());
@@ -524,7 +524,7 @@ Statistics CPointSet::GetStatistics() {                                        /
     // -------- Voronoi cell N-Gon types:                                   // Before orientation order this used to be a measure; see paper by Balzer et al.
     int histogram[10] = { 0,0,0,0,0,0,0,0,0,0 };                            // A simple histogram, where index 0 is interpreted as 3
     for (int i = 0; i < n; i++) {                                           // Iterate through all points
-        VC vc = dt.incident_vertices(s[i].vh[0]), done(vc);                 // We did not call neighbors to save the overhead of allocating Points
+        VC vc = dt.incident_vertices(sites[i].vh[0]), done(vc);                 // We did not call neighbors to save the overhead of allocating Points
         int n = 0; do { n++; } while (++vc != done);                        // Count number of neighbors
         ++histogram[n - 3];                                                 // Increment the respective histogram bin; triangle is the smallest possible cell
     }
@@ -534,7 +534,7 @@ Statistics CPointSet::GetStatistics() {                                        /
     for (int i = 0; i < n; i++) {                                           // First we need to calculate pressure of each cell
         double a = 0;                                                       // Area of Voronoi cell
         double XProduct;
-        FC fc2 = dt.incident_faces(s[i].vh[0]), fc1(fc2++), done(fc1);      // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
+        FC fc2 = dt.incident_faces(sites[i].vh[0]), fc1(fc2++), done(fc1);      // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
         do {
             Point& c1 = fc1->info().c, & c2 = fc2->info().c;                // Circumcenters of faces are endpoints of Voronoi cell edge
             XProduct = c1.x() * c2.y() - c1.y() * c2.x();
@@ -585,7 +585,7 @@ void CPointSet::plotEPS(std::string fileName) {                                 
     fprintf(epsfile, "/r %f def\n", radius / ONE);
     fprintf(epsfile, "/p {r 0 360 arc fill} def\n");                        // A typical PS function for point plotting
     for (int i = 0; i < n; i++) {                                           // Loop through all points
-        Point p = normalize(s[i].p);                                        // Normalize and wrap back to unit torus
+        Point p = normalize(sites[i].p);                                        // Normalize and wrap back to unit torus
         fprintf(epsfile, "%f %f p\n", p.x(), p.y());                        // Print out
     }
     fprintf(epsfile, "showpage\n");                                         // Some viewer (e.g. new version of evince) may need this to display properly
