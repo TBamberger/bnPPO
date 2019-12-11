@@ -7,6 +7,7 @@
 #include <math.h>
 #include <time.h>
 #include <complex>
+#include <iostream>
 
 #include "getopt.c"
 #include "drand48.c"
@@ -33,7 +34,7 @@ typedef DT::Face_handle                                             FH;
 typedef DT::Vertex_circulator                                       VC;
 typedef DT::Face_circulator                                         FC;
 
-unsigned* shuffle(const unsigned N) {                                           // Return a randomly ordered list.
+unsigned* shuffle(const unsigned N) {                                           // Return a randomly ordered list with the integers from 0 to N-1
     unsigned* list = new unsigned[N];
     for (int i = 0; i < N; i++) list[i] = i;
     for (unsigned i = 0; i < N - 1; i++) {
@@ -45,10 +46,7 @@ unsigned* shuffle(const unsigned N) {                                           
 
 inline double rnd(double& max) { return drand48() * max; }
 
-const double TWO_PI = 6.28318530717959;
 const double epsilon = 1e-12;
-double maxNorm = 0.03;                                                          // From BNOT
-
 
 struct Statistics {                                                             // This structure is adapted from psa code "https://code.google.com/p/psa/"
     double mindist;                                                             // Global minimum nearest neighbor distance
@@ -66,7 +64,7 @@ struct Statistics {                                                             
         N4(0), N5(0), N6(0), N7(0), N8(0) {};
 };
 
-inline bool isInRect(const Point& p, const Point& BL, const Point& TR) {        // Check if a point is inside a given rectangle
+inline bool isInRect(const Point& p, const Point& BL, const Point& TR) {
     return BL.x() <= p.x() && BL.y() <= p.y() &&
         p.x() < TR.x() && p.y() < TR.y();
 }
@@ -114,7 +112,7 @@ private:
         inline double x() { return p.x(); };
         inline double y() { return p.y(); };
     };
-    std::vector<TSite> sites;                                                       // The final coordinates of points.
+    std::vector<TSite> sites;                                                   // The final coordinates of points.
     inline double toroidallinearDist(double x1, double x2) const {              // 1D Nearest distance between replicas of two points
         double dx = x1 - x2;                                                    // Find distance in primary period
         while (dx > HALF) dx -= ONE;                                            // If larger than half the period length another replica is certainly nearer
@@ -126,7 +124,7 @@ private:
         double dy = toroidallinearDist(p1.y(), p2.y());
         return dx * dx + dy * dy;
     };
-    inline double toroidalDist(Point& p1, Point& p2) const {                    // 2D Nearest distance
+    inline double toroidalDist(Point& p1, Point& p2) const {
         return sqrt(toroidalSqDist(p1, p2));
     };
     inline Point mainReplica(Point& p) {
@@ -139,16 +137,16 @@ private:
     };
 
     inline Point replica(Point& p, int i) {                                     // Find one of the 9 replicas of a point
-        i = (i + 4) % 9;                                                          // We make the middle replica at index 0
-        double x = p.x() + (i % 3 - 1) * ONE;                                     // Add -ONE, 0, or ONE to x
-        double y = p.y() + (i / 3 - 1) * ONE;                                     // Same for y
+        i = (i + 4) % 9;                                                        // We make the middle replica at index 0
+        double x = p.x() + (i % 3 - 1) * ONE;                                   // Add -ONE, 0, or ONE to x
+        double y = p.y() + (i / 3 - 1) * ONE;                                   // Same for y
         return Point(x, y);
     };
     Point marginBL, marginTR;                                                   // Points within these margins affect points in the main replica
     Point setSite(int index, Point p);
     void moveSite(int index, Point p);
 
-    inline void moveSite(int index, Vector shift) {                             // A handy function to shift points relative to their current location
+    inline void moveSite(int index, Vector shift) {                             // shifts points relative to their current location
         if (shift.squared_length() > epsilon) {
             moveSite(index, sites[index].p + shift);
         }
@@ -172,20 +170,16 @@ private:
     void initGrid();
 
 public:
-    std::string outputPath;                                                // Path for output files; could be set to a folder in /tmp
     int stableCount;
     CPointSet(int number_of_points, int initType = 0);                          // 0: random, 1: darts, 2: jittered grid, 3: regular grid
 
     void getPoints(double* outMatrix); // outMatrix has to be allocated for 2*nPoints doubles (e.g. via mxCreateDoubleMatrix and mxGetPr)
 
-    double PPO_serial(std::string seq, double scale = 1);
+    double PPO_serial(std::string seq);
 
-    void setOutputPath(std::string path) { outputPath = path; };                // Let the user choose output folder. May be /tmp/??
     void setdmin(double d) { rel_dmin = d; };                                   // Set target NND for spring().
     void setRc(double r) { rel_rc = r; };
-    void set_sdA(double sd) { sdA = sd; }
-    void plotEPS(std::string fileName);                                         // Plot EPS file of points
-    void printText(std::string fileName);                                       // Generate a text printout
+    void set_sdA(double sd) { sdA = sd; };
     bool isAllStable() { return allStable; };
     double getMaxShift() { return sqrt(maxShift); }
     Statistics GetStatistics();
@@ -193,8 +187,6 @@ public:
         for (int i = 0; i < n; i++) sites[i].isStable = false;
         allStable = false;
     }
-
-    void statis_multi_sets(std::string filename_base);
 };
 
 CPointSet::CPointSet(int number_of_points, int initType) {
@@ -202,9 +194,6 @@ CPointSet::CPointSet(int number_of_points, int initType) {
     rel_dmin = 0.87;
     rel_rc = 0.65;
     sdA = 0.038600518;
-    //ONE = 1.0;        
-    //HALF = 0.5;
-    outputPath = "";
 
     n = number_of_points;                                                     // Number of points in one period
     ONE = sqrt(n);
@@ -230,16 +219,15 @@ void CPointSet::getPoints(double* outMatrix)
 {
     for (int row = 0; row < n; row++)
     {
-        Point p = normalize(sites[row].p); // Normalize and wrap back to unit torus
+        Point p = mainReplica(sites[row].p);
+        // If scaling point set back to [0,1)^2 is desired, use this line instead
+        //Point p = normalize(sites[row].p); // Normalize and wrap back to unit torus
 
         outMatrix[row] = p.x();
         outMatrix[n + row] = p.y();
     }
 }
 
-/*
-generate intial point set randomly
-*/
 void CPointSet::initRandom() {
     for (int i = 0; i < n; i++) {
         Point p(rnd(ONE), rnd(ONE));
@@ -297,7 +285,7 @@ void CPointSet::initGrid() {
     }
 }
 
-Vector CPointSet::centroid(int index) {                                         // See http://en.wikipedia.org/wiki/Centroid
+Vector CPointSet::centroid(int index) {
     double a = 0, cx = 0, cy = 0;                                               // Cell area (actually twice the area) and centroid coordinates
     double XProduct;                                                            // Cross product of vectors to adjacent vertices
     FC fc = dt.incident_faces(sites[index].vh[0]), done(fc);
@@ -311,24 +299,31 @@ Vector CPointSet::centroid(int index) {                                         
     } while (fc != done);
     cx /= 3.0 * a;
     cy /= 3.0 * a;
-    return Point(cx, cy) - sites[index].p;                                          // Return shift from current position to centroid
+    return Point(cx, cy) - sites[index].p;                                      // Return shift from current position to centroid
 };
 
-Point CPointSet::setSite(int index, Point p) {                                         // Set location of the indexed point (in t-domain) and insert it in triangulation
+Point CPointSet::setSite(int index, Point p) {                                  // Set location of the indexed point (in t-domain) and insert it in triangulation
     p = mainReplica(p);
     sites[index].p = p;                                                         // Save a handy copy of point coordinates
     sites[index].isStable = false;
-    for (int i = 0; i < 9; i++) {                                           // We loop through the 9 replicas,
-        if (isInRect(replica(p, i), marginBL, marginTR)) {                  // if the location of a replica is within margin
-            sites[index].vh[i] = dt.insert(replica(p, i));                      // insert replica in triangulation and keep handle to it
-            sites[index].vh[i]->info().id = index;                              // Point the DT point back to map entry
-        }
-        else sites[index].vh[i] = NULL;
+    for (int i = 0; i < 9; i++) {                                               // We loop through the 9 replicas,
+        //if (isInRect(replica(p, i), marginBL, marginTR)) {                      // if the location of a replica is within margin
+        //    sites[index].vh[i] = dt.insert(replica(p, i));                      // insert replica in triangulation and keep handle to it
+        //    sites[index].vh[i]->info().id = index;                              // Point the DT point back to map entry
+        //}
+        //else
+        //{
+        //    sites[index].vh[i] = NULL;
+        //}
+
+        // todo: is it justified to remove the margin to allow for other settings of ONE than sqrt(n)
+        sites[index].vh[i] = dt.insert(replica(p, i));                      // insert replica in triangulation and keep handle to it
+        sites[index].vh[i]->info().id = index;                              // Point the DT point back to map entry
     }
     return p;
 };
 
-void CPointSet::moveSite(int index, Point p) {                                         // Adjust location of indexed point (in t-domain) and update in triangulation
+void CPointSet::moveSite(int index, Point p) {                                  // Adjust location of indexed point (in t-domain) and update in triangulation
     double l = (p - sites[index].p).squared_length();
     maxShift = std::max(maxShift, l);
     sites[index].p = p;                                                         // Save a handy copy of updated point coordinates
@@ -338,10 +333,10 @@ void CPointSet::moveSite(int index, Point p) {                                  
     }
     sites[index].becomeStable = false;                                          // Mark the point instable
     VC vc = dt.incident_vertices(sites[index].vh[0]), done(vc);
-    do {                                                                    // Mark neighbors instable
+    do {                                                                        // Mark neighbors instable
         sites[vc->info().id].becomeStable = false;
     } while (++vc != done);
-    allStable = false;                                                      // Mark the whole point set instable
+    allStable = false;                                                          // Mark the whole point set instable
 };
 
 Vector CPointSet::capacitySerial(int i) {                                       // Immediately update a site and neighbors
@@ -349,8 +344,8 @@ Vector CPointSet::capacitySerial(int i) {                                       
     double sum_w = 0;
     double a = 0;                                                               // Area of Voronoi cell
     double XProduct;
-    FC fc2 = dt.incident_faces(sites[i].vh[0]), fc1(fc2++);                         // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
-    VC vc = dt.incident_vertices(sites[i].vh[0], fc2), done(vc);                    // The vertex sharing fc1 anf fc2 with v[i].vh
+    FC fc2 = dt.incident_faces(sites[i].vh[0]), fc1(fc2++);                     // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
+    VC vc = dt.incident_vertices(sites[i].vh[0], fc2), done(vc);                // The vertex sharing fc1 anf fc2 with v[i].vh
     int m = 0;                                                                  // Number of neighbors
     Vector dir[20];                                                             // Direction vectors to neighbors
     int id[20];                                                                 // Id's of neighbors. We can't use the circulator for updating
@@ -374,7 +369,7 @@ Vector CPointSet::capacitySerial(int i) {                                       
             sum_w += el[j] * el[j];
         }
         pressure = -2 * dA / sum_w;
-        for (int j = 0; j < m; j++) {                                               // Loop again through neighbors to give each an appropriately sized nudge
+        for (int j = 0; j < m; j++) {                                           // Loop again through neighbors to give each an appropriately sized nudge
             Vector force = pressure * el[j] * dir[j];
             moveSite(id[j], force);
         }
@@ -383,7 +378,8 @@ Vector CPointSet::capacitySerial(int i) {                                       
 }
 
 // test conflict resolution by pushing neighbors
-Vector CPointSet::conflict(int index) {
+Vector CPointSet::conflict(int index)
+{
     double dmin = rel_dmin * dhex;
     Point& p = sites[index].p;
     bool conflict[30];
@@ -409,7 +405,8 @@ Vector CPointSet::conflict(int index) {
 }
 
 // A coverage routine which pulls neighbors
-Vector CPointSet::coverage(int index) {                                        // Apply push and pull shifts to optimze conflict and coverage, respectivly
+Vector CPointSet::coverage(int index)
+{
     double rc = rel_rc * dhex;
     double dmin = rel_dmin * dhex;
     int id[30];
@@ -427,7 +424,7 @@ Vector CPointSet::coverage(int index) {                                        /
             double l = VL(c - sites[index].p);
             scale[m] = rc / l;
         }
-        else scale[m] = 2;                                                    // > 1
+        else scale[m] = 2; // > 1
         m++;
     } while (++fc != done);
     for (int i = 0; i < m; i++) {
@@ -440,14 +437,14 @@ Vector CPointSet::coverage(int index) {                                        /
     return Vector(0, 0);
 }
 
-double CPointSet::PPO_serial(std::string seq, double scale) {
+double CPointSet::PPO_serial(std::string seq) {
     maxShift = 0;
-    for (int i = 0; i < n; i++) sites[i].becomeStable = true;                       // Assume all points will be found stable.
+    for (int i = 0; i < n; i++) sites[i].becomeStable = true;                   // Assume all points will be found stable.
     allStable = true;                                                           // Assume the point set will be found stable.
     unsigned* order = shuffle(n);
     for (int i = 0; i < n; i++) {                                               // Iterate through numbers up to maximum index
         int index = order[i];                                                   // Translate index according to the random order
-        if (sites[index].isStable) continue;                                        // Skip stable points
+        if (sites[index].isStable) continue;
         for (int k = 0; k < seq.length(); k++) {
             switch (seq[k]) {
             case '0': coverage(index); break;
@@ -465,23 +462,7 @@ double CPointSet::PPO_serial(std::string seq, double scale) {
     return sqrt(maxShift);                                                      // Return maximum shift which can be used to monitor convergence
 }
 
-void CPointSet::printText(std::string fileName) {                               // Generate a text printout
-    std::string fname = outputPath + fileName;
-    const char* fullFileName = fname.c_str();
-    FILE* file = fopen(fullFileName, "w");
-    if (!file) {
-        fprintf(stderr, "Failed to open %s\n", fullFileName);
-        exit(1);
-    }
-    fprintf(file, "%d\n", n);                                                   // Print number of points in first line; a common convention
-    for (int i = 0; i < n; i++) {                                               // Loop through all points
-        Point p = normalize(sites[i].p);                                            // Normalize and wrap back to unit torus
-        fprintf(file, "%0.12f %0.12f\n", p.x(), p.y());
-    }
-    fclose(file);
-}
-
-Statistics CPointSet::GetStatistics() {                                        // Return statistics useful to monitor progress of optimization
+Statistics CPointSet::GetStatistics() {                                         // Return statistics useful to monitor progress of optimization
     Statistics stats;                                                           // This function is adapted from PSA code.
     stats.mindist = ONE;                                                        // The minimum distance can't go above ONE :)
     stats.avgmindist = 0;                                                       // Reset this to 0 to accumulate for averaging
@@ -510,7 +491,7 @@ Statistics CPointSet::GetStatistics() {                                        /
         stats.avgmindist += sqrtf(localmd);
         acc += abs(localacc);
     }
-    // -------- Coverage Radius
+    // Coverage Radius
     double Rc = 0;
     Point BL(0, 0), TR(ONE, ONE);                                               // We will consider only faces in one period
     DT::Finite_faces_iterator it;
@@ -521,20 +502,20 @@ Statistics CPointSet::GetStatistics() {                                        /
             if (r > Rc) { Rc = r; }                                             // If larger than current farthest distance update the latter
         }
     }
-    // -------- Voronoi cell N-Gon types:                                   // Before orientation order this used to be a measure; see paper by Balzer et al.
+    // Voronoi cell N-Gon types:                                   // Before orientation order this used to be a measure; see paper by Balzer et al.
     int histogram[10] = { 0,0,0,0,0,0,0,0,0,0 };                            // A simple histogram, where index 0 is interpreted as 3
     for (int i = 0; i < n; i++) {                                           // Iterate through all points
         VC vc = dt.incident_vertices(sites[i].vh[0]), done(vc);                 // We did not call neighbors to save the overhead of allocating Points
         int n = 0; do { n++; } while (++vc != done);                        // Count number of neighbors
         ++histogram[n - 3];                                                 // Increment the respective histogram bin; triangle is the smallest possible cell
     }
-    // -------- capacity variations
+    // capacity variations
     updateFaceInfo();                                                       // Update circumcenters
     double aa = 0;
     for (int i = 0; i < n; i++) {                                           // First we need to calculate pressure of each cell
         double a = 0;                                                       // Area of Voronoi cell
         double XProduct;
-        FC fc2 = dt.incident_faces(sites[i].vh[0]), fc1(fc2++), done(fc1);      // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
+        FC fc2 = dt.incident_faces(sites[i].vh[0]), fc1(fc2++), done(fc1);  // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
         do {
             Point& c1 = fc1->info().c, & c2 = fc2->info().c;                // Circumcenters of faces are endpoints of Voronoi cell edge
             XProduct = c1.x() * c2.y() - c1.y() * c2.x();
@@ -553,7 +534,7 @@ Statistics CPointSet::GetStatistics() {                                        /
         norm += dist.squared_length();
     }
 
-    // -------- Aggregate statistics:
+    // Aggregate statistics:
     stats.mindist = sqrtf(stats.mindist) / dhex;                            // Nearest Neighbor Distance (NND) should
     stats.avgmindist /= n * dhex;                                           // be relative to dhex, the NND of hexagonal lattice
     stats.orientorder = abs(acc) / nacc;                                    // I don't quite get why we should average this once rather than average averages
@@ -568,195 +549,45 @@ Statistics CPointSet::GetStatistics() {                                        /
     return stats;
 }
 
-void CPointSet::plotEPS(std::string fileName) {                                        // Plot EPS file of points
-    std::string fname = outputPath + fileName;
-    const char* fullFileName = fname.c_str();
 
-    FILE* epsfile = fopen(fullFileName, "w");
-    if (!epsfile) {
-        fprintf(stderr, "Failed to open %s\n", fullFileName);
-        exit(1);
-    }
-    double radius = 0.1 * dhex;
-    fprintf(epsfile, "%%!PS-Adobe-3.0 EPSF-3.0\n");
-    fprintf(epsfile, "%%%%BoundingBox: 0 0 1000 1000\n");                   // Plot a single period
-    fprintf(epsfile, "/ONE %f def\n", ONE);
-    fprintf(epsfile, "1000 dup scale\n");                                   // We scale down to unit torus to follow the BNOT convention
-    fprintf(epsfile, "/r %f def\n", radius / ONE);
-    fprintf(epsfile, "/p {r 0 360 arc fill} def\n");                        // A typical PS function for point plotting
-    for (int i = 0; i < n; i++) {                                           // Loop through all points
-        Point p = normalize(sites[i].p);                                        // Normalize and wrap back to unit torus
-        fprintf(epsfile, "%f %f p\n", p.x(), p.y());                        // Print out
-    }
-    fprintf(epsfile, "showpage\n");                                         // Some viewer (e.g. new version of evince) may need this to display properly
-    fclose(epsfile);                                                        // We need to close the file explicitly coz we are generating so many files
-}
-
-const char* USAGE_MESSAGE = "Usage: %s [options] <n>\n"
-"Options:\n"
-"-I <initialization type: 0: random, 1: darts, 2: jittered grid, 3: regular grid>\n"
-"-i <number of iterations>\n"
-"-p <path/prefix of output files>\n"
-"-s <scale applied to forces>\n"
-"-d <target dmin>\n"
-"-r <target coverage radius>\n"
-"-v <normalized maximum deviation of cell areas>\n"
-"-e order eps plots\n"
-"-t order text printouts\n"
-"-m order printout of measurements\n"
-"-q <forces sequence>\n"
-"-R <rounds>\n"
-;
-
-//int main(int argc,char **argv) {
-//    srand(time(NULL)); srand48(time(NULL));                                     // Random seeds to random number generators (int and real)
-//    int opt;                                                                    // For use by getopt, the command line options utility
-//    int iterations = 1;                                                         // Number of iterations to apply
-//    char *fileNamePrefix = (char *)"";                                          // Current working directory is default output directory
-//    bool printText = false;                                                     // Whether to make text printouts
-//    double scale = 1.0;                                                         // Scale applied to forces. From experience We prefer damping the forces (~5%).
-//    bool serial = false;                                                        // Whether to apply shifts serially (FPO style), we found it to improve isotropy
-//    bool printEPS = false;                                                      // Whether to make EPS plots
-//    bool printMeasurments = false;                                              // Whether to print measurements after each iteration. Do not set if profiling speed.
-//    double dmin = 0.87;                                                         // Target dmin for use by our spring relaxation
-//    double rc = 0.65;                                                           // Target rc for use by coverage relaxation
-//    int forceType = 0;                                                          // The force to use; default is cco.
-//    int initialization = 0;
-//    double sdA = -1;                                                            // Target sdA.
-//    std::string seq = "012";
-//    int rounds = 1;
-//    while ((opt = getopt(argc, argv, "I:i:p:k:s:d:r:v:q:x:R:etSm")) != -1) {        // Modify default settings with command line options
-//        switch (opt) {
-//            case 'I': initialization = atoi(optarg); break;
-//            case 'i': iterations = atoi(optarg); break;
-//            case 'p': fileNamePrefix = optarg; break;
-//            case 's': scale = atof(optarg); break;
-//            case 'd': dmin = atof(optarg); break;
-//            case 'r': rc = atof(optarg); break;
-//            case 'e': printEPS = true; break;
-//            case 't': printText = true; break;
-//            case 'm': printMeasurments = true; break;
-//            case 'v': sdA = atof(optarg); break;
-//            case 'q': seq = optarg; break;
-//            case 'R': rounds = atoi(optarg); break;
-//            default: fprintf(stderr, USAGE_MESSAGE, argv[0]); exit(1);
-//        }
-//    }
-//    if (optind > argc - 1) {
-//        fprintf(stderr, USAGE_MESSAGE, argv[0]); exit(1);
-//    }
-//    int n = atoi(argv[optind]);
-//    fprintf(stderr, "Initializing ..");
-//    CPointSet ps(n, initialization);                                            // Create the point set
-//    fprintf(stderr, ". done\n");
-//
-//    ps.setOutputPath(fileNamePrefix);                                           // Set path to output files (typically a temporary folder)
-//	ps.setdmin(dmin);                                                           // Set target dmin
-//	ps.setRc(rc);                                                               // Set target coverage radius
-//	if (sdA >= 0) ps.set_sdA(sdA);
-//
-//	
-//    if (printEPS) { ps.plotEPS("original.eps"); }                               // If EPS plots are ordered, make a plot prior to optimization
-//    if (printText) { ps.printText("original.txt"); }                            // If text prints are ordered, make a printout prior to optimization
-//
-//	int i;
-//	clock_t tOpt0 = clock();
-//	ps.setAllUnstable();
-//	for (i = 0; i < iterations; i++) {                                          // The main optimization loop
-//		int ft = forceType;
-//		std::string q = seq;
-//		
-//		ps.PPO_serial(seq);
-//
-//		double iterationMax = ps.getMaxShift();
-//		double ratio_stable = (double)ps.stableCount / n;
-//
-//		fprintf(
-//			stderr,
-//			"%4d - stable = %6d, stable-ratio = %10.8f, max-step = %10.8f",
-//			i, ps.stableCount, ratio_stable, iterationMax
-//			);
-//
-//		fprintf(stderr, "\n");
-//
-//		if (ps.isAllStable()) break;
-//	}
-//
-//    clock_t tOpt1 = clock();
-//    double totalTime = (double)(tOpt1 - tOpt0) / CLOCKS_PER_SEC;
-//    fprintf(stderr, "Total optimization time: %10.6fs\n", totalTime);
-//
-//	if (printMeasurments) {
-//		Statistics stats = ps.GetStatistics();                              // Read statistics after this iteration
-//		fprintf(stderr,                                                     // Print stats. It could be convenient to pipeline stderr to file then "tail -f"
-//			"Statistics Info: sdA = %8f, "
-//			"N4-N8%% = {%.4f,%.4f,%.4f,%.4f,%.4f}, "
-//			"Rc = %.3f, Belta = %.3f, G-MD = %.3f, A-MD = %.3f, BOO = %.3f, "
-//			"Xnorm = %.6f\n",
-//			stats.sdA, 100 * stats.N4, 100 * stats.N5,
-//			100 * stats.N6, 100 * stats.N7, 100 * stats.N8,
-//			stats.coverageRadius, stats.coverageRadius / stats.mindist,
-//			stats.mindist, stats.avgmindist,
-//			stats.orientorder,
-//			stats.positionNorm
-//			);
-//	}
-//
-//	char fName[200];                                                            // A buffer to compile output file names
-//	if (printEPS) { sprintf(fName, "pushpull2d_%.3f_%.3f_%02d.eps", dmin, rc, rounds); ps.plotEPS(fName); }     // Make EPS plot is ordered
-//	if (printText) { sprintf(fName, "pushpull2d_%.3f_%.3f_%02d.txt", dmin, rc, rounds); ps.printText(fName); }  // Make text printout if ordered
-//
-//}
-
-void optimizePattern(double dMin, double rC, double deltaMin, unsigned int nPoints, int initType, double *outMatrix) //todo: initType via struct
+void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, int initType, double *outMatrix) //todo: initType via struct
 {
     // defaults from .bat file: dMin=0.85, rC=0.67, sda=0.02
     // defaults from code (have never used them): dMin=0.87, rC=0.65, sda=-1
 
-    // todo: deltaMin is currently ignored
+    // todo: areaDeltaMax is currently ignored
     srand(time(NULL)); srand48(time(NULL));                                     // Random seeds to random number generators (int and real)
-    int iterations = 1;                                                         // Number of iterations to apply
-    double scale = 1.0;                                                         // Scale applied to forces. From experience We prefer damping the forces (~5%).
-    bool serial = false;                                                        // Whether to apply shifts serially (FPO style), we found it to improve isotropy
-    double dmin = dMin;                                                         // Target dmin for use by our spring relaxation
-    double rc = rC;                                                           // Target rc for use by coverage relaxation
-    int forceType = 0;                                                          // The force to use; default is cco.
-    int initialization = 0;
-    double sdA = -1;                                                            // Target sdA.
+    int initialization = initType;
+    double sdA = -1;
     std::string seq = "012";
-    int rounds = 1;
+    int iterations = 150; // pushPull bat file used 3500 iterations
 
-    int n = nPoints;
-    initialization = initType;
-    iterations = 3500; //todo: I have just used the value from the run_push-pull script
-    dmin = deltaMin;
-    rounds = 0; // todo: what does this do? In run_push-pull it is set to 0
+    CPointSet ps(nPoints, initialization);
 
-    CPointSet ps(n, initialization); // Create the point set
-
-    ps.setdmin(dmin);                                                           // Set target dmin
-    ps.setRc(rc);                                                               // Set target coverage radius
+    ps.setdmin(dMin);
+    ps.setRc(rC);
     if (sdA >= 0) ps.set_sdA(sdA);
 
     ps.setAllUnstable();
-    for (int i = 0; i < iterations; ++i) {                                          // The main optimization loop
-        int ft = forceType;
-        std::string q = seq;
-
+    for (int i = 0; i < iterations; ++i)
+    {
         ps.PPO_serial(seq);
 
-        double iterationMax = ps.getMaxShift();
-        double ratio_stable = (double)ps.stableCount / n;
-
+        double maxStep = ps.getMaxShift();
+        double ratio_stable = (double)ps.stableCount / nPoints;
         fprintf(
             stderr,
-            "%4d - stable = %6d, stable-ratio = %10.8f, max-step = %10.8f",
-            i, ps.stableCount, ratio_stable, iterationMax
+            "%4d - stable = %6d, stable-ratio = %10.8f, max-step = %10.8f\n",
+            i, ps.stableCount, ratio_stable, maxStep
         );
 
-        fprintf(stderr, "\n");
-
-        if (ps.isAllStable()) break;
+        if (ps.isAllStable())
+        {
+            std::cout << "stable pattern reached at iteration " << i << std::endl;
+            break;
+        }
     }
+    if (!ps.isAllStable())
+        std::cout << "Did not reach a stable pattern in " << iterations << " iterations. Unfinished pattern is returned";
     ps.getPoints(outMatrix);
 }
