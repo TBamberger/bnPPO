@@ -349,37 +349,40 @@ void CPointSet::moveSite(int index, Point p) {                                  
     allStable = false;                                                          // Mark the whole point set instable
 };
 
-Vector CPointSet::capacitySerial(int i) {                                       // Immediately update a site and neighbors
-    double d[20], el[20], pressure;
-    double sum_w = 0;
-    double a = 0;                                                               // Area of Voronoi cell
-    double XProduct;
+Vector CPointSet::capacitySerial(int i)
+{
+    double d[20];  // Distance to neighbor (= 2 x distance to Voronoi edge)
+    double el[20]; // length of the voronoi edges
+    double area = 0; // Area of Voronoi cell
     FC fc2 = dt.incident_faces(sites[i].vh[0]), fc1(fc2++);                     // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
-    VC vc = dt.incident_vertices(sites[i].vh[0], fc2), done(vc);                // The vertex sharing fc1 anf fc2 with v[i].vh
+    VC vc = dt.incident_vertices(sites[i].vh[0], fc2), done(vc);                // The vertex sharing fc1 and fc2 with v[i].vh
     int m = 0;                                                                  // Number of neighbors
     Vector dir[20];                                                             // Direction vectors to neighbors
     int id[20];                                                                 // Id's of neighbors. We can't use the circulator for updating
     do {
         Point c1 = dt.circumcenter(fc1), c2 = dt.circumcenter(fc2);             // Circumcenters of faces are endpoints of Voronoi cell edge
-        XProduct = c1.x() * c2.y() - c1.y() * c2.x();
-        a += XProduct;                                                          // Accumulate areas
+        area += c1.x() * c2.y() - c1.y() * c2.x();                              // Accumulate areas (rhs is cross product)
         el[m] = sqrt((c2 - c1).squared_length());                               // Length of Voronoi edge
         dir[m] = (vc->point() - sites[i].p);
-        d[m] = sqrt(dir[m].squared_length());                                   // Distance to neighbor (= 2 x distance to Voronoi edge)
+        d[m] = sqrt(dir[m].squared_length());                                   
         dir[m] = dir[m] / d[m];                                                 // Normalize direction vector
         id[m] = vc->info().id;
         ++fc1;
         ++fc2;
         ++m;
     } while (++vc != done);
-    a /= 2;
-    double dA = a - 1;                                                          // Required expansion or contraction
-    if (fabs(dA) > sdA) {
-        for (int j = 0; j < m; j++) {
+    area /= 2;
+    double averageArea = ONE_X * ONE_Y / n;
+    double dA = area - averageArea; // Required expansion or contraction WHY IS 1 SUBTRACTED FROM AREA? deviation from average area (WHICH IS NOT GENERALLY 1!!!)
+    if (fabs(dA) > sdA)
+    {
+        double sum_w = 0;
+        for (int j = 0; j < m; j++)
             sum_w += el[j] * el[j];
-        }
-        pressure = -2 * dA / sum_w;
-        for (int j = 0; j < m; j++) {                                           // Loop again through neighbors to give each an appropriately sized nudge
+        double pressure = -2 * dA / sum_w; // pressure per unit length of edges
+
+        for (int j = 0; j < m; j++)
+        {                                           
             Vector force = pressure * el[j] * dir[j];
             moveSite(id[j], force);
         }
@@ -570,7 +573,7 @@ void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int n
     int initialization = initType;
     double sdA = -1;
     std::string seq = "012";
-    int iterations = 150; // pushPull bat file used 3500 iterations
+    int iterations = 500; // pushPull bat file used 3500 iterations
 
     CPointSet ps(nPoints, initialization);
 
