@@ -94,8 +94,10 @@ private:
     double rel_rc;                                                              // Relative maximum coverage radius.
     double sdA;                                                                 // Target standard deviation of cell areas; default is from Schlomer thesis p 64.
     bool allStable;                                                             // To implement termination criteria
-    double ONE;                                                                 // Make it possible to use another size for torroidal domain.
-    double HALF;
+    double ONE_X;                                                                 // Make it possible to use another size for torroidal domain.
+    double ONE_Y;
+    double HALF_X;
+    double HALF_Y;
     DT dt;                                                                      // Will maintain a Delaunay triangulation for relaxation and queries
     double maxShift;
     void updateFaceInfo() {
@@ -113,15 +115,21 @@ private:
         inline double y() { return p.y(); };
     };
     std::vector<TSite> sites;                                                   // The final coordinates of points.
-    inline double toroidallinearDist(double x1, double x2) const {              // 1D Nearest distance between replicas of two points
+    inline double toroidallinearDistX(double x1, double x2) const {              // 1D Nearest distance between replicas of two points
         double dx = x1 - x2;                                                    // Find distance in primary period
-        while (dx > HALF) dx -= ONE;                                            // If larger than half the period length another replica is certainly nearer
-        while (dx < -HALF) dx += ONE;                                           // Same, but opposite ordering of points
+        while (dx > HALF_X) dx -= ONE_X;                                            // If larger than half the period length another replica is certainly nearer
+        while (dx < -HALF_X) dx += ONE_X;                                           // Same, but opposite ordering of points
+        return dx;
+    };
+    inline double toroidallinearDistY(double x1, double x2) const {              // 1D Nearest distance between replicas of two points
+        double dx = x1 - x2;                                                    // Find distance in primary period
+        while (dx > HALF_Y) dx -= ONE_Y;                                            // If larger than half the period length another replica is certainly nearer
+        while (dx < -HALF_Y) dx += ONE_Y;                                           // Same, but opposite ordering of points
         return dx;
     };
     inline double toroidalSqDist(Point& p1, Point& p2) const {                  // 2D Nearest distance; square to avoid costly square root operation
-        double dx = toroidallinearDist(p1.x(), p2.x());
-        double dy = toroidallinearDist(p1.y(), p2.y());
+        double dx = toroidallinearDistX(p1.x(), p2.x());
+        double dy = toroidallinearDistY(p1.y(), p2.y());
         return dx * dx + dy * dy;
     };
     inline double toroidalDist(Point& p1, Point& p2) const {
@@ -129,17 +137,17 @@ private:
     };
     inline Point mainReplica(Point& p) {
         double x = p.x(), y = p.y();
-        while (x < 0) x += ONE;
-        while (x >= ONE) x -= ONE;
-        while (y < 0) y += ONE;
-        while (y >= ONE) y -= ONE;
+        while (x < 0) x += ONE_X;
+        while (x >= ONE_X) x -= ONE_X;
+        while (y < 0) y += ONE_Y;
+        while (y >= ONE_Y) y -= ONE_Y;
         return Point(x, y);
     };
 
     inline Point replica(Point& p, int i) {                                     // Find one of the 9 replicas of a point
         i = (i + 4) % 9;                                                        // We make the middle replica at index 0
-        double x = p.x() + (i % 3 - 1) * ONE;                                   // Add -ONE, 0, or ONE to x
-        double y = p.y() + (i / 3 - 1) * ONE;                                   // Same for y
+        double x = p.x() + (i % 3 - 1) * ONE_X;                                   // Add -ONE, 0, or ONE to x
+        double y = p.y() + (i / 3 - 1) * ONE_Y;                                   // Same for y
         return Point(x, y);
     };
     Point marginBL, marginTR;                                                   // Points within these margins affect points in the main replica
@@ -160,8 +168,8 @@ private:
 
     inline Point normalize(Point p) {                                           // Scale to unit & wrap around if points were shifted outside primary period
         p = mainReplica(p);
-        double x = p.x() / ONE;
-        double y = p.y() / ONE;
+        double x = p.x() / ONE_X;
+        double y = p.y() / ONE_Y;
         return Point(x, y);
     };
     void initRandom();
@@ -196,12 +204,14 @@ CPointSet::CPointSet(int number_of_points, int initType) {
     sdA = 0.038600518;
 
     n = number_of_points;                                                     // Number of points in one period
-    ONE = sqrt(n);
-    HALF = 0.5 * ONE;
-    dhex = ONE * sqrt(2 / (sqrt(3) * n));                                     // Maximum packing distance
+    ONE_X = sqrt(n);
+    ONE_Y = sqrt(n) / 2;
+    HALF_X = 0.5 * ONE_X;
+    HALF_Y = 0.5 * ONE_Y;
+    dhex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                                     // Maximum packing distance
     double margin = std::min(10 / sqrt(n), 1.0);                              // Margin for toroidal domain. Heuristically, use 10 layers of points.
-    marginBL = Point(-margin * ONE, -margin * ONE);                           // Bottom-left of primary period + margin
-    marginTR = Point((1 + margin) * ONE, (1 + margin) * ONE);                 // Top-right. In our convention BL is included, TR is excluded
+    marginBL = Point(-margin * ONE_X, -margin * ONE_Y);                           // Bottom-left of primary period + margin
+    marginTR = Point((1 + margin) * ONE_X, (1 + margin) * ONE_Y);                 // Top-right. In our convention BL is included, TR is excluded
     sites.resize(n);                                                          // The final location including shifts
     switch (initType) {
     case 0: initRandom(); break;
@@ -230,7 +240,7 @@ void CPointSet::getPoints(double* outMatrix)
 
 void CPointSet::initRandom() {
     for (int i = 0; i < n; i++) {
-        Point p(rnd(ONE), rnd(ONE));
+        Point p(rnd(ONE_X), rnd(ONE_Y));
         setSite(i, p);
     }
 }
@@ -246,7 +256,7 @@ void CPointSet::initDarts() {
         Point p;
         bool accepted;
         do {
-            p = Point(rnd(ONE), rnd(ONE));
+            p = Point(rnd(ONE_X), rnd(ONE_Y));
             accepted = true;
             int counter = 0;
             for (int j = 0; (j < i) && accepted; j++) {
@@ -464,13 +474,13 @@ double CPointSet::PPO_serial(std::string seq) {
 
 Statistics CPointSet::GetStatistics() {                                         // Return statistics useful to monitor progress of optimization
     Statistics stats;                                                           // This function is adapted from PSA code.
-    stats.mindist = ONE;                                                        // The minimum distance can't go above ONE :)
+    stats.mindist = std::max(ONE_X, ONE_Y);                                                        // The minimum distance can't go above ONE :)
     stats.avgmindist = 0;                                                       // Reset this to 0 to accumulate for averaging
     stats.orientorder = 0;                                                      // ~
     std::complex<double> acc = 0;
     unsigned long nacc = 0;
     for (int i = 0; i < n; i++) {
-        double localmd = ONE;
+        double localmd = std::max(ONE_X, ONE_Y);
         std::complex<double> localacc = 0;
         VC vc = dt.incident_vertices(sites[i].vh[0]),
             done(vc), next;
@@ -493,7 +503,7 @@ Statistics CPointSet::GetStatistics() {                                         
     }
     // Coverage Radius
     double Rc = 0;
-    Point BL(0, 0), TR(ONE, ONE);                                               // We will consider only faces in one period
+    Point BL(0, 0), TR(ONE_X, ONE_Y);                                               // We will consider only faces in one period
     DT::Finite_faces_iterator it;
     for (it = dt.finite_faces_begin(); it != dt.finite_faces_end(); it++) {     // Iterate through all finite faces in triangulation
         if (isInRect(it->vertex(0)->point(), BL, TR)) {                         // It suffices to have one vertex within main period to consider the face
