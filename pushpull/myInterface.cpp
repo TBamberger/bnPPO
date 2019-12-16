@@ -14,16 +14,19 @@
 // 3: init type: random, darts, jittered grid, regular grid, specific pattern (passed in the next argument)
 // 4: if init type is 'specific': Nx2 input matrix of existing point pattern
 //    else: number of points to generate
-// 5: TODO: params for aspect ratio
+// 5: aspect ratio pattern height (y direction) is always 1, pattern width (x direction) is aspectRatio
 //
 // lhs:
 //  Nx2 matrix where each row is a point of the generated pattern
+//
+// full signature
+// noisePattern = myPPO(dMin, r_c, d_min?, initType, nPoints/inputPattern, aspectRatio
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate and retrieve parameters
-    if (nrhs != 5)
-        mexErrMsgIdAndTxt("BN:nrhs", "5 inputs required");
+    if (nrhs != 6)
+        mexErrMsgIdAndTxt("BN:nrhs", "6 inputs required");
     
     if (nlhs != 1)
         mexErrMsgIdAndTxt("BN:nlhs", "One output required");
@@ -37,6 +40,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double rF = mxGetScalar(prhs[0]);
     double rC = mxGetScalar(prhs[1]);
     double capacityConstraint = mxGetScalar(prhs[2]);
+    double aspectRatio = mxGetScalar(prhs[5]);
     
     size_t initTypeLen = mxGetN(prhs[3]) + 1;
     char *initType = new char[initTypeLen];
@@ -49,12 +53,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             mexErrMsgIdAndTxt("BN:notDouble", "point coordinates have to be a Nx2 matrix of doubles");
     
         double *inMatrix = mxGetPr(prhs[4]);
-        size_t nColsIn = mxGetN(prhs[0]);
-        size_t nRowsIn = mxGetM(prhs[0]);
+        size_t nColsIn = mxGetN(prhs[4]);
+        size_t nRowsIn = mxGetM(prhs[4]);
         for (mwIndex i = 0; i < nRowsIn; ++i)
         {
             mwIndex subs[2] = {i, 0};
-            mwIndex xValIndex = mxCalcSingleSubscript(prhs[0], 2, subs);
+            mwIndex xValIndex = mxCalcSingleSubscript(prhs[4], 2, subs);
             printf("index %d, element (%f %f)\n", xValIndex, inMatrix[xValIndex], inMatrix[xValIndex]);
         }
         
@@ -73,7 +77,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         
         if (std::strcmp(initType, "random") == 0)
         {
-            optimizePattern(rF, rC, capacityConstraint, nPoints, 0, outMatrix);
+            optimizePattern(rF, rC, capacityConstraint, nPoints, 0, outMatrix, aspectRatio);
         }
         else if (std::strcmp(initType, "darts") == 0)
         {

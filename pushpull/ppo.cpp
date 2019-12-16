@@ -8,6 +8,7 @@
 #include <time.h>
 #include <complex>
 #include <iostream>
+#include <random>
 
 #include "getopt.c"
 #include "drand48.c"
@@ -172,14 +173,14 @@ private:
         double y = p.y() / ONE_Y;
         return Point(x, y);
     };
-    void initRandom();
+    void initRandom(double aspectRatio);
     void initDarts();
     void initJittered();
     void initGrid();
 
 public:
     int stableCount;
-    CPointSet(int number_of_points, int initType = 0);                          // 0: random, 1: darts, 2: jittered grid, 3: regular grid
+    CPointSet(int number_of_points, int initType, double aspectRatio);                          // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid
 
     void getPoints(double* outMatrix); // outMatrix has to be allocated for 2*nPoints doubles (e.g. via mxCreateDoubleMatrix and mxGetPr)
 
@@ -197,15 +198,16 @@ public:
     }
 };
 
-CPointSet::CPointSet(int number_of_points, int initType) {
+CPointSet::CPointSet(int number_of_points, int initType, double aspectRatio)
+{
 
     rel_dmin = 0.87;
     rel_rc = 0.65;
     sdA = 0.038600518;
 
     n = number_of_points;                                                     // Number of points in one period
-    ONE_X = sqrt(n);
-    ONE_Y = sqrt(n) / 2;
+    ONE_X = aspectRatio;
+    ONE_Y = 1;
     HALF_X = 0.5 * ONE_X;
     HALF_Y = 0.5 * ONE_Y;
     dhex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                                     // Maximum packing distance
@@ -214,7 +216,7 @@ CPointSet::CPointSet(int number_of_points, int initType) {
     marginTR = Point((1 + margin) * ONE_X, (1 + margin) * ONE_Y);                 // Top-right. In our convention BL is included, TR is excluded
     sites.resize(n);                                                          // The final location including shifts
     switch (initType) {
-    case 0: initRandom(); break;
+    case 0: initRandom(aspectRatio); break;
     case 1: initDarts(); break;
     case 2: initJittered(); break;
     case 3: initGrid(); break;
@@ -238,9 +240,17 @@ void CPointSet::getPoints(double* outMatrix)
     }
 }
 
-void CPointSet::initRandom() {
-    for (int i = 0; i < n; i++) {
-        Point p(rnd(ONE_X), rnd(ONE_Y));
+void CPointSet::initRandom(double aspectRatio)
+{
+    // todo: optionally seed random engine instead of using random device
+    std::random_device rd;
+    std::default_random_engine re(rd());
+    std::uniform_real_distribution<> distX(0, aspectRatio);
+    std::uniform_real_distribution<> distY(0, 1);
+
+    for (auto i = 0; i < n; ++i)
+    {
+        Point p(distX(re), distY(re));
         setSite(i, p);
     }
 }
@@ -563,7 +573,7 @@ Statistics CPointSet::GetStatistics() {                                         
 }
 
 
-void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, int initType, double *outMatrix) //todo: initType via struct
+void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, int initType, double *outMatrix, double aspectRatio) //todo: initType via struct
 {
     // defaults from .bat file: dMin=0.85, rC=0.67, sda=0.02
     // defaults from code (have never used them): dMin=0.87, rC=0.65, sda=-1
@@ -575,7 +585,7 @@ void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int n
     std::string seq = "012";
     int iterations = 500; // pushPull bat file used 3500 iterations
 
-    CPointSet ps(nPoints, initialization);
+    CPointSet ps(nPoints, initialization, aspectRatio);
 
     ps.setdmin(dMin);
     ps.setRc(rC);
