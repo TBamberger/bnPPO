@@ -76,15 +76,15 @@ inline double triangleType(FC& fc) {
 class CPointSet {
 private:
     std::default_random_engine re;                                              // Use this random engine for all rng related to the point set. This allows to have a fixed seeding per points set.
-    std::uniform_real_distribution<> randX;                                      // Uniform random numbers over the whole domain in x direction
-    std::uniform_real_distribution<> randY;                                      // Uniform random numbers over the whole domain in x direction
+    std::uniform_real_distribution<> randX;                                     // Uniform random numbers over the whole domain in x direction
+    std::uniform_real_distribution<> randY;                                     // Uniform random numbers over the whole domain in x direction
     int n;                                                                      // number of points in one period on an AABitmap
     double dhex;                                                                // Reference spacing of hexagonal packing.
-    double rel_dmin;                                                            // Relative minimum distance between points; twice the conflict radius
-    double rel_rc;                                                              // Relative maximum coverage radius.
-    double sdA;                                                                 // Target standard deviation of cell areas; default is from Schlomer thesis p 64.
+    double rel_dmin = 0.87;                                                     // Relative minimum distance between points; twice the conflict radius
+    double rel_rc = 0.65;                                                       // Relative maximum coverage radius.
+    double sdA = 0.038600518;                                                   // Target standard deviation of cell areas; default is from Schlomer thesis p 64.
     bool allStable;                                                             // To implement termination criteria
-    double ONE_X;                                                                 // Make it possible to use another size for torroidal domain.
+    double ONE_X;                                                               // Make it possible to use another size for torroidal domain.
     double ONE_Y;
     double HALF_X;
     double HALF_Y;
@@ -105,7 +105,7 @@ private:
         inline double y() { return p.y(); };
     };
     std::vector<TSite> sites;                                                   // The final coordinates of points.
-    inline double toroidallinearDistX(double x1, double x2) const {              // 1D Nearest distance between replicas of two points
+    inline double toroidallinearDistX(double x1, double x2) const {             // 1D Nearest distance between replicas of two points
         double dx = x1 - x2;                                                    // Find distance in primary period
         while (dx > HALF_X) dx -= ONE_X;                                            // If larger than half the period length another replica is certainly nearer
         while (dx < -HALF_X) dx += ONE_X;                                           // Same, but opposite ordering of points
@@ -167,10 +167,11 @@ private:
     void initJittered();
     void initGrid();
     unsigned* shuffle(const unsigned N);
-
+    CPointSet(int number_of_points, double aspectRatio);
 public:
     int stableCount;
     CPointSet(int number_of_points, int initType, double aspectRatio);                          // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid
+    CPointSet(int nPoints, double* inputPoints, double aspectRatio); // todo: remove initType since it is not necessary here
 
     void getPoints(double* outMatrix); // outMatrix has to be allocated for 2*nPoints doubles (e.g. via mxCreateDoubleMatrix and mxGetPr)
 
@@ -188,17 +189,13 @@ public:
     }
 };
 
-CPointSet::CPointSet(int number_of_points, int initType, double aspectRatio) :
+CPointSet::CPointSet(int number_of_points, double aspectRatio) :
 #ifdef FIXED_SEED
     re(12345)
 #else
     re(std::random_device{}())
 #endif // FIXED_SEED
 {
-    rel_dmin = 0.87;
-    rel_rc = 0.65;
-    sdA = 0.038600518;
-
     n = number_of_points;                                                     // Number of points in one period
     ONE_X = aspectRatio;
     ONE_Y = 1;
@@ -211,16 +208,33 @@ CPointSet::CPointSet(int number_of_points, int initType, double aspectRatio) :
     marginBL = Point(-margin * ONE_X, -margin * ONE_Y);                       // Bottom-left of primary period + margin
     marginTR = Point((1 + margin) * ONE_X, (1 + margin) * ONE_Y);             // Top-right. In our convention BL is included, TR is excluded
     sites.resize(n);                                                          // The final location including shifts
-    switch (initType) {
-    case 0: initRandom(aspectRatio); break;
-    case 1: initDarts(); break;
-    case 2: initJittered(); break;
-    case 3: initGrid(); break;
+}
+
+CPointSet::CPointSet(int nPoints, int initType, double aspectRatio) : CPointSet(nPoints, aspectRatio)
+{
+    switch (initType)
+    {
+    case 0:
+        initRandom(aspectRatio);
+        break;
+    case 1:
+        initDarts();
+        break;
+    case 2:
+        initJittered();
+        break;
+    case 3:
+        initGrid();
+        break;
     default:
-        fprintf(
-            stderr, "Undefined initialization option %d\n", initType);
+        fprintf(stderr, "Undefined initialization option %d\n", initType);
         exit(1);
     }
+}
+
+CPointSet::CPointSet(int nPoints, double* inputPoints, double aspectRatio) : CPointSet(nPoints, aspectRatio)
+{
+    // todo: implement, process inputPoints
 }
 
 // @return: Randomly ordered list with the integers from 0 to n-1
