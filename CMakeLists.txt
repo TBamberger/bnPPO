@@ -3,9 +3,6 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(pushpull)
-INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/third_party)
-INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/third_party/common)
-ADD_SUBDIRECTORY(third_party)
 
 find_package(CGAL REQUIRED)
 find_package(Matlab)

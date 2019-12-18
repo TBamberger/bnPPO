@@ -4,14 +4,12 @@
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 #include <time.h>
 #include <complex>
 #include <iostream>
 #include <random>
 
-#include "getopt.c"
-#include "drand48.c"
+#define FIXED_SEED // If this is defined a fixed seed is used for RNG to achive reproducible point sets; uses random seed otherwise
 
 #define VL(x) sqrt((x).squared_length())
 
@@ -34,18 +32,6 @@ typedef DT::Vertex_handle                                           VH;
 typedef DT::Face_handle                                             FH;
 typedef DT::Vertex_circulator                                       VC;
 typedef DT::Face_circulator                                         FC;
-
-unsigned* shuffle(const unsigned N) {                                           // Return a randomly ordered list with the integers from 0 to N-1
-    unsigned* list = new unsigned[N];
-    for (int i = 0; i < N; i++) list[i] = i;
-    for (unsigned i = 0; i < N - 1; i++) {
-        unsigned r = i + rand() % (N - 1 - i);
-        std::swap(list[i], list[r]);
-    }
-    return list;
-}
-
-inline double rnd(double& max) { return drand48() * max; }
 
 const double epsilon = 1e-12;
 
@@ -89,6 +75,9 @@ inline double triangleType(FC& fc) {
 
 class CPointSet {
 private:
+    std::default_random_engine re;                                              // Use this random engine for all rng related to the point set. This allows to have a fixed seeding per points set.
+    std::uniform_real_distribution<> randX;                                      // Uniform random numbers over the whole domain in x direction
+    std::uniform_real_distribution<> randY;                                      // Uniform random numbers over the whole domain in x direction
     int n;                                                                      // number of points in one period on an AABitmap
     double dhex;                                                                // Reference spacing of hexagonal packing.
     double rel_dmin;                                                            // Relative minimum distance between points; twice the conflict radius
@@ -177,6 +166,7 @@ private:
     void initDarts();
     void initJittered();
     void initGrid();
+    unsigned* shuffle(const unsigned N);
 
 public:
     int stableCount;
@@ -198,9 +188,13 @@ public:
     }
 };
 
-CPointSet::CPointSet(int number_of_points, int initType, double aspectRatio)
+CPointSet::CPointSet(int number_of_points, int initType, double aspectRatio) :
+#ifdef FIXED_SEED
+    re(12345)
+#else
+    re(std::random_device{}())
+#endif // FIXED_SEED
 {
-
     rel_dmin = 0.87;
     rel_rc = 0.65;
     sdA = 0.038600518;
@@ -210,10 +204,12 @@ CPointSet::CPointSet(int number_of_points, int initType, double aspectRatio)
     ONE_Y = 1;
     HALF_X = 0.5 * ONE_X;
     HALF_Y = 0.5 * ONE_Y;
-    dhex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                                     // Maximum packing distance
+    randX = std::uniform_real_distribution<>(0, ONE_X);
+    randY = std::uniform_real_distribution<>(0, ONE_Y);
+    dhex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                           // Maximum packing distance
     double margin = std::min(10 / sqrt(n), 1.0);                              // Margin for toroidal domain. Heuristically, use 10 layers of points.
-    marginBL = Point(-margin * ONE_X, -margin * ONE_Y);                           // Bottom-left of primary period + margin
-    marginTR = Point((1 + margin) * ONE_X, (1 + margin) * ONE_Y);                 // Top-right. In our convention BL is included, TR is excluded
+    marginBL = Point(-margin * ONE_X, -margin * ONE_Y);                       // Bottom-left of primary period + margin
+    marginTR = Point((1 + margin) * ONE_X, (1 + margin) * ONE_Y);             // Top-right. In our convention BL is included, TR is excluded
     sites.resize(n);                                                          // The final location including shifts
     switch (initType) {
     case 0: initRandom(aspectRatio); break;
@@ -225,6 +221,21 @@ CPointSet::CPointSet(int number_of_points, int initType, double aspectRatio)
             stderr, "Undefined initialization option %d\n", initType);
         exit(1);
     }
+}
+
+// @return: Randomly ordered list with the integers from 0 to n-1
+unsigned* CPointSet::shuffle(const unsigned N)
+{                
+    auto randMax = std::uniform_int_distribution<>();
+    unsigned* list = new unsigned[N];
+    for (int i = 0; i < N; i++)
+        list[i] = i;
+    for (unsigned i = 0; i < N - 1; i++)
+    {
+        unsigned r = i + randMax(re) % (N - 1 - i);
+        std::swap(list[i], list[r]);
+    }
+    return list;
 }
 
 void CPointSet::getPoints(double* outMatrix)
@@ -242,15 +253,9 @@ void CPointSet::getPoints(double* outMatrix)
 
 void CPointSet::initRandom(double aspectRatio)
 {
-    // todo: optionally seed random engine instead of using random device
-    std::random_device rd;
-    std::default_random_engine re(rd());
-    std::uniform_real_distribution<> distX(0, aspectRatio);
-    std::uniform_real_distribution<> distY(0, 1);
-
     for (auto i = 0; i < n; ++i)
     {
-        Point p(distX(re), distY(re));
+        Point p(randX(re), randY(re));
         setSite(i, p);
     }
 }
@@ -258,7 +263,8 @@ void CPointSet::initRandom(double aspectRatio)
 /*
 generate intial point set by Poisson-disk darts
 */
-void CPointSet::initDarts() {
+void CPointSet::initDarts()
+{
     const int MAX = 10000; // To avoid infinite loop
     double r = 0.75 * dhex;
     double rr = r * r;
@@ -266,7 +272,7 @@ void CPointSet::initDarts() {
         Point p;
         bool accepted;
         do {
-            p = Point(rnd(ONE_X), rnd(ONE_Y));
+            p = Point(randX(re), randY(re));
             accepted = true;
             int counter = 0;
             for (int j = 0; (j < i) && accepted; j++) {
@@ -284,25 +290,31 @@ void CPointSet::initDarts() {
 /*
 generate intial point set by jitter
 */
-void CPointSet::initJittered() {
-    int m = sqrt(n);
-    for (int i = 0; i < n; i++) {
-        double x = i % m + 2 * drand48();
-        double y = i / m + 2 * drand48();
-        setSite(i, Point(x, y));
-    }
+void CPointSet::initJittered()
+{
+    std::cerr << "jittered initialization not yet available for rectangular domains." << std::endl;
+    exit(1);
+    //int m = sqrt(n);
+    //for (int i = 0; i < n; i++) {
+    //    double x = i % m + 2 * drand48();
+    //    double y = i / m + 2 * drand48();
+    //    setSite(i, Point(x, y));
+    //}
 }
 
 /*
 generate intial point set regularly
 */
-void CPointSet::initGrid() {
-    int m = sqrt(n);
-    for (int i = 0; i < n; i++) {
-        double x = i % m + 0.5;
-        double y = i / m + 0.5;
-        setSite(i, Point(x, y));
-    }
+void CPointSet::initGrid()
+{
+    std::cerr << "grid initialization not yet available for rectangular domains." << std::endl;
+    exit(1);
+    //int m = sqrt(n);
+    //for (int i = 0; i < n; i++) {
+    //    double x = i % m + 0.5;
+    //    double y = i / m + 0.5;
+    //    setSite(i, Point(x, y));
+    //}
 }
 
 Vector CPointSet::centroid(int index) {
@@ -573,13 +585,12 @@ Statistics CPointSet::GetStatistics() {                                         
 }
 
 
-void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, int initType, double *outMatrix, double aspectRatio) //todo: initType via struct
+void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, int initType, double *outMatrix, double aspectRatio)
 {
     // defaults from .bat file: dMin=0.85, rC=0.67, sda=0.02
     // defaults from code (have never used them): dMin=0.87, rC=0.65, sda=-1
 
     // todo: areaDeltaMax is currently ignored
-    srand(time(NULL)); srand48(time(NULL));                                     // Random seeds to random number generators (int and real)
     int initialization = initType;
     double sdA = -1;
     std::string seq = "012";
