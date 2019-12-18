@@ -361,8 +361,8 @@ void CPointSet::moveSite(int index, Point p) {                                  
 
 Vector CPointSet::capacitySerial(int i)
 {
-    double d[20];  // Distance to neighbor (= 2 x distance to Voronoi edge)
-    double el[20]; // length of the voronoi edges
+    double d[20];    // Distance to neighbor (= 2 x distance to Voronoi edge)
+    double el[20];   // length of the voronoi edges
     double area = 0; // Area of Voronoi cell
     FC fc2 = dt.incident_faces(sites[i].vh[0]), fc1(fc2++);                     // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
     VC vc = dt.incident_vertices(sites[i].vh[0], fc2), done(vc);                // The vertex sharing fc1 and fc2 with v[i].vh
@@ -383,7 +383,7 @@ Vector CPointSet::capacitySerial(int i)
     } while (++vc != done);
     area /= 2;
     double averageArea = ONE_X * ONE_Y / n;
-    double dA = area - averageArea; // Required expansion or contraction WHY IS 1 SUBTRACTED FROM AREA? deviation from average area (WHICH IS NOT GENERALLY 1!!!)
+    double dA = area - averageArea; // Required expansion or contraction
     if (fabs(dA) > sdA)
     {
         double sum_w = 0;

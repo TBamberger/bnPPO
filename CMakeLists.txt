@@ -1,67 +1,17 @@
-# Older versions are most likely possible but were not tested
+ # cmake 3.15 has problems with the matlab interface (known issue) that were resolved in 3.16
+ # versions before 3.15 might work but were not tested
 cmake_minimum_required(VERSION 3.16)
 
-
-# if(COMMAND cmake_minimum_required)
-#    cmake_minimum_required(VERSION 2.4)
-# endif(COMMAND cmake_minimum_required)
-
-# PROJECT(Pushpull)
-# #set_target_properties(pushpull2d PROPERTIES LINKER_LANGUAGE CXX)
-
-
-# SET(PPO_BUILD_PATH ${PROJECT_BINARY_DIR})
-# SET(BINARIES_RELATIVE_PATH /binaries/bin/)
-
-# SET(BUILD_SHARED_LIBS ON)
-
-# IF (WIN32)
-#     SET(LIBRARIES_RELATIVE_PATH /binaries/bin/)
-# ELSE(WIN32)
-#     SET(LIBRARIES_RELATIVE_PATH /binaries/lib/)
-# ENDIF(WIN32)
-
-# IF(WIN32)
-#     SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}${BINARIES_RELATIVE_PATH})
-# ELSE(WIN32)
-#     SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}${LIBRARIES_RELATIVE_PATH})
-# ENDIF(WIN32)
-
-# SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}${BINARIES_RELATIVE_PATH})
-
-# IF (EXISTS ${CMAKE_SOURCE_DIR}/CMakeOptions.txt)
-#    MESSAGE(INFO: "Using local options file: " ${CMAKE_SOURCE_DIR}/CMakeOptions.txt)
-#    INCLUDE(${CMAKE_SOURCE_DIR}/CMakeOptions.txt)
-# ENDIF(EXISTS ${CMAKE_SOURCE_DIR}/CMakeOptions.txt)
-
-# INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR})
-# INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/third_party)
-# INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/third_party/common)
-
-# ADD_SUBDIRECTORY(third_party)
-# ADD_SUBDIRECTORY(pushpull)
-# ADD_SUBDIRECTORY(zoneplate)
-
-# IF(WIN32)
-#   MESSAGE("Configure done. You may need to click on configure again if the OK button is disabled")
-# ENDIF(WIN32)
-
-# ---------------
 project(pushpull)
-# SET(BUILD_SHARED_LIBS ON)
-# add_library(pushpull2d SHARED ${SOURCES}  ${HeaderFiles})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/third_party)
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/third_party/common)
 ADD_SUBDIRECTORY(third_party)
-# ADD_SUBDIRECTORY(pushpull)
 
-IF (EXISTS ${CMAKE_SOURCE_DIR}/CMakeOptions.txt)
-   MESSAGE(INFO: "Using local options file: " ${CMAKE_SOURCE_DIR}/CMakeOptions.txt)
-   INCLUDE(${CMAKE_SOURCE_DIR}/CMakeOptions.txt)
-ENDIF(EXISTS ${CMAKE_SOURCE_DIR}/CMakeOptions.txt)
-
-# add_library(pushpull2d SHARED pushpull/ppo.h pushpull/ppo.cpp)
-# set_target_properties(pushpull2d PROPERTIES LINKER_LANGUAGE CXX)
-
+find_package(CGAL REQUIRED)
 find_package(Matlab)
-matlab_add_mex(NAME myPPO SRC pushpull/myInterface.cpp pushpull/ppo.h pushpull/ppo.cpp)
+matlab_add_mex(NAME blueNoise SRC
+    src/myInterface.cpp
+    src/ppo.h
+    src/ppo.cpp)
+target_include_directories(blueNoise PRIVATE src)
+target_link_libraries(blueNoise CGAL::CGAL)
