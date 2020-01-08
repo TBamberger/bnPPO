@@ -170,6 +170,14 @@ class CPointSet
     CPointSet(int number_of_points, double aspectRatio);
 public:
     int stableCount;
+
+	// Copying is not allowed since this would invalidate all vertex-, face- and edge-handles when the triangulation is copied
+    CPointSet(const CPointSet&) = delete;
+    CPointSet operator=(const CPointSet&) = delete;
+	
+    CPointSet(CPointSet&&) = default;
+    CPointSet& operator=(CPointSet&&) = default;
+	
     CPointSet(int number_of_points, int initType, double aspectRatio);                          // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid
     CPointSet(int nPoints, double* inputPoints, double aspectRatio); // todo: remove initType since it is not necessary here
 
@@ -600,23 +608,8 @@ Statistics CPointSet::GetStatistics() {                                         
     return stats;
 }
 
-void optimizePattern(CPointSet ps, double *outMatrix, double aspectRatio)
+void optimizePattern(CPointSet &&ps, double *outMatrix, double aspectRatio)
 {
-	
-}
-
-void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, int initType, double *outMatrix, double aspectRatio)
-{
-    // defaults from .bat file: dMin=0.85, rC=0.67, sda=0.02
-    // defaults from code (have never used them): dMin=0.87, rC=0.65, sda=-1
-
-
-    CPointSet ps(nPoints, initType, aspectRatio);
-    ps.setdmin(dMin);
-    ps.setRc(rC);
-    double sdA = -1; // todo: areaDeltaMax is currently ignored
-    if (sdA >= 0) ps.set_sdA(sdA);
-
     const auto iterations = 500; // pushPull bat file used 3500 iterations
     ps.setAllUnstable();
     for (int i = 0; i < iterations; ++i)
@@ -636,8 +629,23 @@ void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int n
             break;
         }
     }
-	
+
     if (!ps.isAllStable())
         std::cout << "Did not reach a stable pattern in " << iterations << " iterations. Unfinished pattern is returned";
     ps.getPoints(outMatrix);
+}
+
+void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, int initType, double *outMatrix, double aspectRatio)
+{
+    // defaults from .bat file: dMin=0.85, rC=0.67, sda=0.02
+    // defaults from code (have never used them): dMin=0.87, rC=0.65, sda=-1
+
+
+    CPointSet ps(nPoints, initType, aspectRatio);
+    ps.setdmin(dMin);
+    ps.setRc(rC);
+    double sdA = -1; // todo: areaDeltaMax is currently ignored
+    if (sdA >= 0) ps.set_sdA(sdA);
+
+    optimizePattern(std::move(ps), outMatrix, aspectRatio);
 }

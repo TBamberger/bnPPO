@@ -13,6 +13,9 @@ matlab_add_mex(NAME blueNoise SRC
 target_include_directories(blueNoise PRIVATE src)
 target_link_libraries(blueNoise CGAL::CGAL)
 
-add_executable(blueNoiseStandalone src/main.cpp src/ppo.h src/ppo.cpp)
+add_executable(blueNoiseStandalone
+    src/main.cpp
+    src/ppo.h
+    src/ppo.cpp)
 target_include_directories(blueNoiseStandalone PRIVATE src)
 target_link_libraries(blueNoiseStandalone CGAL::CGAL)
