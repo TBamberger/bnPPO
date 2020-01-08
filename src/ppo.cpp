@@ -73,8 +73,8 @@ inline double triangleType(FC& fc) {
     );
 }
 
-class CPointSet {
-private:
+class CPointSet
+{
     std::default_random_engine re;                                              // Use this random engine for all rng related to the point set. This allows to have a fixed seeding per points set.
     std::uniform_real_distribution<> randX;                                     // Uniform random numbers over the whole domain in x direction
     std::uniform_real_distribution<> randY;                                     // Uniform random numbers over the whole domain in x direction
@@ -95,7 +95,7 @@ private:
         for (; fit != dt.finite_faces_end(); fit++) {                           // Iterate through all (finite) faces in triangulation
             fit->info().c = dt.circumcenter(fit);                               // Circumcenter of face is one end of a Voronoi edge
         }
-    };
+    }
     struct TSite {                                                              // This is to handle the Delaunay triangulation.
         Point p;
         VH vh[9];                                                               // Handles to up to 9 replicas to maintain toroidal domain
@@ -105,50 +105,50 @@ private:
         inline double y() { return p.y(); };
     };
     std::vector<TSite> sites;                                                   // The final coordinates of points.
-    inline double toroidallinearDistX(double x1, double x2) const {             // 1D Nearest distance between replicas of two points
+    double toroidallinearDistX(double x1, double x2) const {             // 1D Nearest distance between replicas of two points
         double dx = x1 - x2;                                                    // Find distance in primary period
         while (dx > HALF_X) dx -= ONE_X;                                            // If larger than half the period length another replica is certainly nearer
         while (dx < -HALF_X) dx += ONE_X;                                           // Same, but opposite ordering of points
         return dx;
-    };
-    inline double toroidallinearDistY(double x1, double x2) const {              // 1D Nearest distance between replicas of two points
+    }
+    double toroidallinearDistY(double x1, double x2) const {              // 1D Nearest distance between replicas of two points
         double dx = x1 - x2;                                                    // Find distance in primary period
         while (dx > HALF_Y) dx -= ONE_Y;                                            // If larger than half the period length another replica is certainly nearer
         while (dx < -HALF_Y) dx += ONE_Y;                                           // Same, but opposite ordering of points
         return dx;
-    };
-    inline double toroidalSqDist(Point& p1, Point& p2) const {                  // 2D Nearest distance; square to avoid costly square root operation
+    }
+    double toroidalSqDist(Point& p1, Point& p2) const {                  // 2D Nearest distance; square to avoid costly square root operation
         double dx = toroidallinearDistX(p1.x(), p2.x());
         double dy = toroidallinearDistY(p1.y(), p2.y());
         return dx * dx + dy * dy;
-    };
-    inline double toroidalDist(Point& p1, Point& p2) const {
+    }
+    double toroidalDist(Point& p1, Point& p2) const {
         return sqrt(toroidalSqDist(p1, p2));
-    };
-    inline Point mainReplica(Point& p) {
+    }
+    Point mainReplica(Point& p) {
         double x = p.x(), y = p.y();
         while (x < 0) x += ONE_X;
         while (x >= ONE_X) x -= ONE_X;
         while (y < 0) y += ONE_Y;
         while (y >= ONE_Y) y -= ONE_Y;
         return Point(x, y);
-    };
+    }
 
-    inline Point replica(Point& p, int i) {                                     // Find one of the 9 replicas of a point
+    Point replica(Point& p, int i) {                                     // Find one of the 9 replicas of a point
         i = (i + 4) % 9;                                                        // We make the middle replica at index 0
         double x = p.x() + (i % 3 - 1) * ONE_X;                                   // Add -ONE, 0, or ONE to x
         double y = p.y() + (i / 3 - 1) * ONE_Y;                                   // Same for y
         return Point(x, y);
-    };
+    }
     Point marginBL, marginTR;                                                   // Points within these margins affect points in the main replica
     Point setSite(int index, Point p);
     void moveSite(int index, Point p);
 
-    inline void moveSite(int index, Vector shift) {                             // shifts points relative to their current location
+    void moveSite(int index, Vector shift) {                             // shifts points relative to their current location
         if (shift.squared_length() > epsilon) {
             moveSite(index, sites[index].p + shift);
         }
-    };
+    }
     // Relaxation forces:
     typedef Vector(CPointSet::* forceFunction) (int);                           // A pointer to a member function for calculating forces & return shift vectors
     Vector centroid(int index);
@@ -175,7 +175,9 @@ public:
 
     void getPoints(double* outMatrix); // outMatrix has to be allocated for 2*nPoints doubles (e.g. via mxCreateDoubleMatrix and mxGetPr)
 
-    double PPO_serial(std::string seq);
+    double PPO_serial(std::string seq); // seq specifies the order of local optimizations
+
+    int getNumberOfPoints() { return n; }
 
     void setdmin(double d) { rel_dmin = d; };                                   // Set target NND for spring().
     void setRc(double r) { rel_rc = r; };
@@ -598,35 +600,34 @@ Statistics CPointSet::GetStatistics() {                                         
     return stats;
 }
 
+void optimizePattern(CPointSet ps, double *outMatrix, double aspectRatio)
+{
+	
+}
 
 void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, int initType, double *outMatrix, double aspectRatio)
 {
     // defaults from .bat file: dMin=0.85, rC=0.67, sda=0.02
     // defaults from code (have never used them): dMin=0.87, rC=0.65, sda=-1
 
-    // todo: areaDeltaMax is currently ignored
-    int initialization = initType;
-    double sdA = -1;
-    std::string seq = "012";
-    int iterations = 500; // pushPull bat file used 3500 iterations
 
-    CPointSet ps(nPoints, initialization, aspectRatio);
-
+    CPointSet ps(nPoints, initType, aspectRatio);
     ps.setdmin(dMin);
     ps.setRc(rC);
+    double sdA = -1; // todo: areaDeltaMax is currently ignored
     if (sdA >= 0) ps.set_sdA(sdA);
 
+    const auto iterations = 500; // pushPull bat file used 3500 iterations
     ps.setAllUnstable();
     for (int i = 0; i < iterations; ++i)
     {
-        ps.PPO_serial(seq);
+        ps.PPO_serial("012");
 
-        double maxStep = ps.getMaxShift();
-        double ratio_stable = (double)ps.stableCount / nPoints;
+        double stableRatio = (double)ps.stableCount / ps.getNumberOfPoints();
         fprintf(
             stderr,
             "%4d - stable = %6d, stable-ratio = %10.8f, max-step = %10.8f\n",
-            i, ps.stableCount, ratio_stable, maxStep
+            i, ps.stableCount, stableRatio, ps.getMaxShift()
         );
 
         if (ps.isAllStable())
@@ -635,6 +636,7 @@ void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int n
             break;
         }
     }
+	
     if (!ps.isAllStable())
         std::cout << "Did not reach a stable pattern in " << iterations << " iterations. Unfinished pattern is returned";
     ps.getPoints(outMatrix);
