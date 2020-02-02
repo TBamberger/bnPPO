@@ -616,6 +616,7 @@ Statistics CPointSet::GetStatistics() {                                         
 
 void optimizePattern(double dMin, double rC, CPointSet &&ps, double *outMatrix, double aspectRatio)
 {
+    const bool printStatistics = false;
     // defaults from .bat file: dMin=0.85, rC=0.67, sda=0.02
 	// defaults from code (have never used them): dMin=0.87, rC=0.65, sda=-1
     ps.setdmin(dMin);
@@ -623,28 +624,28 @@ void optimizePattern(double dMin, double rC, CPointSet &&ps, double *outMatrix, 
     double sdA = -1; // todo: areaDeltaMax is currently ignored
     if (sdA >= 0) ps.set_sdA(sdA);
 	
-    const auto iterations = 500; // pushPull bat file used 3500 iterations
+    const auto iterations = 5000; // pushPull bat file used 3500 iterations
     ps.setAllUnstable();
+    std::cout << "rF: " << dMin << std::endl;
     for (int i = 0; i < iterations; ++i)
     {
         ps.PPO_serial("012");
 
-        double stableRatio = (double)ps.stableCount / ps.getNumberOfPoints();
-        fprintf(
-            stderr,
-            "%4d - stable = %6d, stable-ratio = %10.8f, max-step = %10.8f\n",
-            i, ps.stableCount, stableRatio, ps.getMaxShift()
-        );
+        if (printStatistics)
+        {
+            double stableRatio = (double)ps.stableCount / ps.getNumberOfPoints();
+            std::cout << "iter " << i << " - stable " << ps.stableCount << " - stableRatio " << stableRatio << " - maxStep " << ps.getMaxShift() << std::endl;
+        }
 
         if (ps.isAllStable())
         {
-            std::cout << "stable pattern reached at iteration " << i << std::endl;
+            std::cout << "PPO: Stable at iteration " << i << std::endl;
             break;
         }
     }
 
     if (!ps.isAllStable())
-        std::cout << "Did not reach a stable pattern in " << iterations << " iterations. Unfinished pattern is returned";
+        std::cout << "Didn't reach a stable pattern in " << iterations << " iterations. Unfinished pattern is returned!" << std::endl;
     ps.getPoints(outMatrix);
 }
 
