@@ -614,19 +614,16 @@ Statistics CPointSet::GetStatistics() {                                         
     return stats;
 }
 
-void optimizePattern(double dMin, double rC, CPointSet &&ps, double *outMatrix, double aspectRatio)
+void optimizePattern(double dMin, double rC, double areaDeltaMax, CPointSet &&ps, double *outMatrix, double aspectRatio)
 {
     const bool printStatistics = false;
-    // defaults from .bat file: dMin=0.85, rC=0.67, sda=0.02
-	// defaults from code (have never used them): dMin=0.87, rC=0.65, sda=-1
     ps.setdmin(dMin);
     ps.setRc(rC);
-    double sdA = -1; // todo: areaDeltaMax is currently ignored
-    if (sdA >= 0) ps.set_sdA(sdA);
+    if (areaDeltaMax >= 0)
+        ps.set_sdA(areaDeltaMax);
 	
-    const auto iterations = 5000; // pushPull bat file used 3500 iterations
+    const auto iterations = 5000;
     ps.setAllUnstable();
-    std::cout << "rF: " << dMin << std::endl;
     for (int i = 0; i < iterations; ++i)
     {
         ps.PPO_serial("012");
@@ -653,11 +650,11 @@ void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int n
 {
 
     CPointSet ps(nPoints, initType, aspectRatio);
-    optimizePattern(dMin, rC, std::move(ps), outMatrix, aspectRatio);
+    optimizePattern(dMin, rC, areaDeltaMax, std::move(ps), outMatrix, aspectRatio);
 }
 
 void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, double* inMatrix, double* outMatrix, double aspectRatio)
 {
     CPointSet ps(nPoints, inMatrix, aspectRatio);
-    optimizePattern(dMin, rC, std::move(ps), outMatrix, aspectRatio);
+    optimizePattern(dMin, rC, areaDeltaMax, std::move(ps), outMatrix, aspectRatio);
 }

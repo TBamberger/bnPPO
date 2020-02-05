@@ -10,6 +10,7 @@
 //      the nearest sample - relative to r_max, can be >1 but should stay smaller 
 //      for decent blue noise properties
 // 2: capacity constraint / max delta between areas of voronoi cells of the samples
+//    If this value is < 0, the default value of 0.038600518 is used (cf. T. Schlömer thesis p.64 for justification)
 // 3: init type: random, darts, jittered grid, regular grid, specific pattern (passed in the next argument)
 // 4: if init type is 'specific': Nx2 input matrix of existing point pattern
 //                                Note that a lot of iterations are necessary if the input points are concentrated in a
@@ -73,7 +74,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 	}
 	else
 	{
-		if (!mxIsScalar(prhs[4])) // todo: assert that prhs[4] is an integer value
+		if (!mxIsScalar(prhs[4]))
 			mexErrMsgIdAndTxt("BN:notScalar", "if init type is not 'specific' the number of initial points has to be given as a scalar");
 		const int nPoints = static_cast<int>(*mxGetPr(prhs[4]));
 
