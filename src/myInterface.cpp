@@ -28,7 +28,7 @@
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 {
 	// Validate and retrieve parameters
-	if (nrhs != 7)
+	if (nrhs != 6) // todo: 7
 		mexErrMsgIdAndTxt("BN:nrhs", "7 inputs required");
 
 	if (nlhs != 1)
@@ -60,13 +60,14 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 		const size_t nRowsIn = mxGetM(prhs[4]);
 
 
-		if (!mxIsDouble(prhs[6]) || mxGetN(prhs[6]) != 2)
-			mexErrMsgIdAndTxt("BN:notDouble", "point coordinates have to be a Nx2 matrix of doubles");
+		// todo
+		//if (!mxIsDouble(prhs[6]) || mxGetN(prhs[6]) != 2)
+		//	mexErrMsgIdAndTxt("BN:notDouble", "point coordinates have to be a Nx2 matrix of doubles");
 
-		double* inMatrixFixedTile = mxGetPr(prhs[6]);
+		/* todo double* inMatrixFixedTile = mxGetPr(prhs[6]);
 
 		if (mxGetM(prhs[6]) != nRowsIn)
-			mexErrMsgIdAndTxt("BN:incompatibleTileSize", "fixed and optimized tile need to have the same number of points");
+			mexErrMsgIdAndTxt("BN:incompatibleTileSize", "fixed and optimized tile need to have the same number of points");*/
 
 		// Print input matrix elements
 		//for (mwIndex i = 0; i < nRowsIn; ++i)
@@ -78,7 +79,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 
 		plhs[0] = mxCreateDoubleMatrix(static_cast<mwSize>(nRowsIn), static_cast<mwSize>(nColsIn), mxREAL);
 		double* outMatrix = mxGetPr(plhs[0]);
-		optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, inMatrixFixedTile, outMatrix, aspectRatio);
+		// todo optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, inMatrixFixedTile, outMatrix, aspectRatio);
+		optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, outMatrix, aspectRatio);
 		// Generate blue noise
 	}
 	else

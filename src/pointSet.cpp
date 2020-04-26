@@ -30,7 +30,12 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 		// Mark neighbors unstable (has to be done for each replica since replicas might be in different triangulations
 		// and therefore have different neighbors).
 		VC vc = dts[replicas[replicaId].dtId].incident_vertices(vh), done(vc);
-		do { sites[vc->info().id].becomeStable = false; } while (++vc != done);
+		do
+		{
+			if (!dts[replicas[replicaId].dtId].is_infinite(vc))
+				sites[vc->info().id].becomeStable = false;
+		}
+		while (++vc != done);
 	}
 	sites[siteId].becomeStable = false;
 	allStable = false;
@@ -186,7 +191,7 @@ PointSet::PointSet(int number_of_points, double aspectRatio) :
 	double margin = std::min(10 / sqrt(n), 1.0);                              // Margin for toroidal domain. Heuristically, use 10 layers of points.
 	marginBL = Point(-margin * ONE_X, -margin * ONE_Y);                       // Bottom-left of primary period + margin
 	marginTR = Point((1 + margin) * ONE_X, (1 + margin) * ONE_Y);             // Top-right. In our convention BL is included, TR is excluded
-	sites.resize(2 * n);                                                          // The final location including shifts
+	//sites.resize(2 * n);                                                          // The final location including shifts
 }
 
 PointSet::PointSet(int nPoints, int initType, double aspectRatio) : PointSet(nPoints, aspectRatio)
@@ -222,6 +227,7 @@ PointSet::PointSet(int nPoints, int initType, double aspectRatio) : PointSet(nPo
 PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : PointSet(nPoints, aspectRatio)
 {
 	dts.resize(1);
+	arrangements.resize(1);
 	
 	for (auto i = 0; i < n; ++i)
 	{
@@ -233,31 +239,105 @@ PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : Point
 		{
 			Replica r;
 			const auto replicaId = replicas.size();
-			
-			r.vh = dts[0].insert(createReplica(p, i));
+			r.vh = dts[0].insert(createReplica(p, j));
 			r.vh->info().id = siteId;
 			r.dtId = 0;
 			replicas.push_back(r);
 			site.replicaIds.push_back(replicaId);
+			if (j == 0) // replicas in center tile
+			{
+				arrangements[0].replicaIdsToIterate.push_back(replicaId);
+			}
 		}
 		sites.push_back(site);
 	}
 }
 
-PointSet::PointSet(int nPoints, double* inputPoints, double* inputPointsFixedTile, double aspectRatio) : PointSet(nPoints, aspectRatio) // todo: 
+PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, double aspectRatio) : PointSet(nPoints, aspectRatio) // todo: 
 {
-	std::cerr << "not implemented" << std::endl;
-	exit(1);
+	//dts.resize(3);
+
+	//// toroidal tile 1
 	//for (auto i = 0; i < n; ++i)
 	//{
 	//	Point p(inputPoints[i], inputPoints[i + n]);
-	//	setSite(i, p);
+
+	//	Site site;
+	//	const auto siteId = sites.size();
+	//	for (auto j = 0; j < 9; ++j)
+	//	{
+	//		Replica r;
+	//		const auto replicaId = replicas.size();
+
+	//		r.vh = dts[0].insert(createReplica(p, j));
+	//		r.vh->info().id = siteId;
+	//		r.dtId = 0;
+	//		replicas.push_back(r);
+	//		site.replicaIds.push_back(replicaId);
+	//	}
+	//	sites.push_back(site);
+	//}
+
+	//// toroidal tile 2
+	//for (auto i = 0; i < n; ++i)
+	//{
+	//	Point p(inputPoints2[i], inputPoints2[i + n]);
+
+	//	Site site;
+	//	const auto siteId = sites.size();
+	//	for (auto j = 0; j < 9; ++j)
+	//	{
+	//		Replica r;
+	//		const auto replicaId = replicas.size();
+
+	//		r.vh = dts[1].insert(createReplica(p, j));
+	//		r.vh->info().id = siteId;
+	//		r.dtId = 1;
+	//		replicas.push_back(r);
+	//		site.replicaIds.push_back(replicaId);
+	//	}
+	//	sites.push_back(site);
+	//}
+
+	//// tile1/tile2 border
+	//for (auto i = 0; i < n; ++i) // place tiles of tile 1 in the center tile
+	//{
+	//	Point p(inputPoints[i], inputPoints[i + n]);
+
+	//	Site site;
+	//	const auto siteId = sites.size();
+	//	for (auto j = 0; j < 9; ++j)
+	//	{
+	//		Replica r;
+	//		const auto replicaId = replicas.size();
+
+	//		r.vh = dts[3].insert(createReplica(p, j));
+	//		r.vh->info().id = siteId;
+	//		r.dtId = 3;
+	//		replicas.push_back(r);
+	//		site.replicaIds.push_back(replicaId);
+	//	}
+	//	sites.push_back(site);
 	//}
 
 	//for (auto i = 0; i < n; ++i)
 	//{
-	//	Point p(inputPointsFixedTile[i], inputPointsFixedTile[i + n]);
-	//	setSiteOnlyCenterReplica(i + n, p);
+	//	Point p(inputPoints2[i], inputPoints2[i + n]);
+
+	//	Site site;
+	//	const auto siteId = sites.size();
+	//	for (auto j = 0; j < 9; ++j)
+	//	{
+	//		Replica r;
+	//		const auto replicaId = replicas.size();
+
+	//		r.vh = dts[3].insert(createReplica(p, j));
+	//		r.vh->info().id = siteId;
+	//		r.dtId = 3;
+	//		replicas.push_back(r);
+	//		site.replicaIds.push_back(replicaId);
+	//	}
+	//	sites.push_back(site);
 	//}
 }
 
@@ -281,6 +361,7 @@ int PointSet::ppo()
 			}
 		}
 		for (auto& site : sites) site.isStable = site.becomeStable;
+		std::cout << iteration << std::endl;
 	}
 	return allStable ? iteration : -1;
 }
