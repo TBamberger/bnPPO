@@ -6,9 +6,9 @@ int main()
 {
 	const auto dMin = 0.85;
 	const auto rC = 0.67;
-	const auto areaDeltaMax = 0.0;
+	const auto areaDeltaMax = -1;
 
-	const auto nPoints = 50;
+	const auto nPoints = 150;
 	const auto coordinatesPerPoint = 2; // 2D
 	auto* outMatrix = new double[nPoints * coordinatesPerPoint];
 

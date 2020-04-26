@@ -353,13 +353,18 @@ int PointSet::ppo()
 		allStable = true; // Assume the point set will be found stable. (This will be set to false as soon as a point is moved)
 		for (const auto& arrangement : arrangements)
 		{
-			for (auto replicaId : arrangement.replicaIdsToIterate) // todo: consider traversing the points in site in random order
+			unsigned* order = shuffle(arrangement.replicaIdsToIterate.size());
+			for (size_t i = 0; i < arrangement.replicaIdsToIterate.size(); ++i)
 			{
+				auto iRandom = order[i];
+				auto replicaId = arrangement.replicaIdsToIterate[iRandom];
 				coverage(replicaId);
 				conflict(replicaId);
 				capacity(replicaId);
 			}
+			delete[] order;
 		}
+		
 		for (auto& site : sites) site.isStable = site.becomeStable;
 		std::cout << iteration << std::endl;
 	}

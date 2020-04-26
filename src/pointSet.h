@@ -81,6 +81,21 @@ class PointSet
 		return Point(x, y);
 	}
 
+	// @return: Randomly ordered list with the integers from 0 to n-1
+	unsigned* PointSet::shuffle(const unsigned n)
+	{
+		const auto randMax = std::uniform_int_distribution<>();
+		unsigned* list = new unsigned[n];
+		for (int i = 0; i < n; i++)
+			list[i] = i;
+		for (unsigned i = 0; i < n - 1; i++)
+		{
+			unsigned r = i + randMax(re) % (n - 1 - i);
+			std::swap(list[i], list[r]);
+		}
+		return list;
+	}
+	
 	PointSet(int number_of_points, double aspectRatio);
 public:
 	// Copying is not allowed since this would invalidate all vertex-, face- and edge-handles when the triangulation is copied
