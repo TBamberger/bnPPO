@@ -6,16 +6,22 @@ project(pushpull)
 
 find_package(CGAL REQUIRED)
 find_package(Matlab)
-matlab_add_mex(NAME blueNoise SRC
+matlab_add_mex(NAME blueNoiseTwoTiles SRC
     src/myInterface.cpp
+    src/pointSet.h
+    src/pointSet.cpp
     src/ppo.h
-    src/ppo.cpp)
-target_include_directories(blueNoise PRIVATE src)
-target_link_libraries(blueNoise CGAL::CGAL)
+    src/ppo.cpp
+    src/utility.h)
+target_include_directories(blueNoiseTwoTiles PRIVATE src)
+target_link_libraries(blueNoiseTwoTiles CGAL::CGAL)
 
 add_executable(blueNoiseStandalone
     src/main.cpp
+    src/pointSet.h
+    src/pointSet.cpp
     src/ppo.h
-    src/ppo.cpp)
+    src/ppo.cpp
+    src/utility.h)
 target_include_directories(blueNoiseStandalone PRIVATE src)
 target_link_libraries(blueNoiseStandalone CGAL::CGAL)
