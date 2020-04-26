@@ -228,7 +228,8 @@ PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : Point
 {
 	dts.resize(1);
 	arrangements.resize(1);
-	
+
+	const auto dtId = 0;
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints[i], inputPoints[i + n]);
@@ -239,14 +240,14 @@ PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : Point
 		{
 			Replica r;
 			const auto replicaId = replicas.size();
-			r.vh = dts[0].insert(createReplica(p, j));
+			r.vh = dts[dtId].insert(createReplica(p, j));
 			r.vh->info().id = siteId;
-			r.dtId = 0;
+			r.dtId = dtId;
 			replicas.push_back(r);
 			site.replicaIds.push_back(replicaId);
 			if (j == 0) // replicas in center tile
 			{
-				arrangements[0].replicaIdsToIterate.push_back(replicaId);
+				arrangements[dtId].replicaIdsToIterate.push_back(replicaId);
 			}
 		}
 		sites.push_back(site);
@@ -255,90 +256,98 @@ PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : Point
 
 PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, double aspectRatio) : PointSet(nPoints, aspectRatio) // todo: 
 {
-	//dts.resize(3);
+	dts.resize(3);
+	arrangements.resize(3);
 
-	//// toroidal tile 1
-	//for (auto i = 0; i < n; ++i)
-	//{
-	//	Point p(inputPoints[i], inputPoints[i + n]);
+	// tile1 toroidal
+	auto dtId = 0;
+	for (auto i = 0; i < n; ++i)
+	{
+		Point p(inputPoints[i], inputPoints[i + n]);
 
-	//	Site site;
-	//	const auto siteId = sites.size();
-	//	for (auto j = 0; j < 9; ++j)
-	//	{
-	//		Replica r;
-	//		const auto replicaId = replicas.size();
+		Site site;
+		const auto siteId = sites.size();
+		for (auto j = 0; j < 9; ++j)
+		{
+			Replica r;
+			const auto replicaId = replicas.size();
+			r.vh = dts[dtId].insert(createReplica(p, j));
+			r.vh->info().id = siteId;
+			r.dtId = dtId;
+			replicas.push_back(r);
+			site.replicaIds.push_back(replicaId);
+			if (j == 0) // replicas in center tile
+			{
+				arrangements[dtId].replicaIdsToIterate.push_back(replicaId);
+			}
+		}
+		sites.push_back(site);
+	}
 
-	//		r.vh = dts[0].insert(createReplica(p, j));
-	//		r.vh->info().id = siteId;
-	//		r.dtId = 0;
-	//		replicas.push_back(r);
-	//		site.replicaIds.push_back(replicaId);
-	//	}
-	//	sites.push_back(site);
-	//}
+	// tile2 toroidal
+	dtId = 1;
+	for (auto i = 0; i < n; ++i)
+	{
+		Point p(inputPoints2[i], inputPoints2[i + n]);
 
-	//// toroidal tile 2
-	//for (auto i = 0; i < n; ++i)
-	//{
-	//	Point p(inputPoints2[i], inputPoints2[i + n]);
+		Site site;
+		const auto siteId = sites.size();
+		for (auto j = 0; j < 9; ++j)
+		{
+			Replica r;
+			const auto replicaId = replicas.size();
+			r.vh = dts[dtId].insert(createReplica(p, j));
+			r.vh->info().id = siteId;
+			r.dtId = dtId;
+			replicas.push_back(r);
+			site.replicaIds.push_back(replicaId);
+			if (j == 0) // replicas in center tile
+			{
+				arrangements[dtId].replicaIdsToIterate.push_back(replicaId);
+			}
+		}
+		sites.push_back(site);
+	}
 
-	//	Site site;
-	//	const auto siteId = sites.size();
-	//	for (auto j = 0; j < 9; ++j)
-	//	{
-	//		Replica r;
-	//		const auto replicaId = replicas.size();
+	// tile1/tile2 border
+	dtId = 2;
+	for (auto i = 0; i < n; ++i) // tile1 in center of arrangement
+	{
+		Point p(inputPoints[i], inputPoints[i + n]);
 
-	//		r.vh = dts[1].insert(createReplica(p, j));
-	//		r.vh->info().id = siteId;
-	//		r.dtId = 1;
-	//		replicas.push_back(r);
-	//		site.replicaIds.push_back(replicaId);
-	//	}
-	//	sites.push_back(site);
-	//}
+		Site site;
+		const auto siteId = sites.size();
 
-	//// tile1/tile2 border
-	//for (auto i = 0; i < n; ++i) // place tiles of tile 1 in the center tile
-	//{
-	//	Point p(inputPoints[i], inputPoints[i + n]);
+		Replica r;
+		const auto replicaId = replicas.size();
+		r.vh = dts[dtId].insert(createReplica(p, 0)); // 0 is center tile
+		r.vh->info().id = siteId;
+		r.dtId = dtId;
+		replicas.push_back(r);
+		site.replicaIds.push_back(replicaId);
+		arrangements[dtId].replicaIdsToIterate.push_back(replicaId);
+		
+		sites.push_back(site);
+	}
 
-	//	Site site;
-	//	const auto siteId = sites.size();
-	//	for (auto j = 0; j < 9; ++j)
-	//	{
-	//		Replica r;
-	//		const auto replicaId = replicas.size();
+	for (auto i = 0; i < n; ++i) // tile2 on the eight outer tiles of the arrangement
+	{
+		Point p(inputPoints2[i], inputPoints2[i + n]);
 
-	//		r.vh = dts[3].insert(createReplica(p, j));
-	//		r.vh->info().id = siteId;
-	//		r.dtId = 3;
-	//		replicas.push_back(r);
-	//		site.replicaIds.push_back(replicaId);
-	//	}
-	//	sites.push_back(site);
-	//}
-
-	//for (auto i = 0; i < n; ++i)
-	//{
-	//	Point p(inputPoints2[i], inputPoints2[i + n]);
-
-	//	Site site;
-	//	const auto siteId = sites.size();
-	//	for (auto j = 0; j < 9; ++j)
-	//	{
-	//		Replica r;
-	//		const auto replicaId = replicas.size();
-
-	//		r.vh = dts[3].insert(createReplica(p, j));
-	//		r.vh->info().id = siteId;
-	//		r.dtId = 3;
-	//		replicas.push_back(r);
-	//		site.replicaIds.push_back(replicaId);
-	//	}
-	//	sites.push_back(site);
-	//}
+		Site site;
+		const auto siteId = sites.size();
+		for (auto j = 1; j < 9; ++j) // 1-8 are the outer tiles
+		{
+			Replica r;
+			const auto replicaId = replicas.size();
+			r.vh = dts[dtId].insert(createReplica(p, j));
+			r.vh->info().id = siteId;
+			r.dtId = dtId;
+			replicas.push_back(r);
+			site.replicaIds.push_back(replicaId);
+		}
+		sites.push_back(site);
+	}
 }
 
 int PointSet::ppo()

@@ -8,7 +8,7 @@ int main()
 	const auto rC = 0.67;
 	const auto areaDeltaMax = -1;
 
-	const auto nPoints = 150;
+	const auto nPoints = 100;
 	const auto coordinatesPerPoint = 2; // 2D
 	auto* outMatrix = new double[nPoints * coordinatesPerPoint];
 
@@ -24,7 +24,16 @@ int main()
 	{
 		points[i] = randX(re);
 	}
-	optimizePattern(dMin, rC, areaDeltaMax, nPoints, points, outMatrix, aspectRatio);
-	
+	//optimizePattern(dMin, rC, areaDeltaMax, nPoints, points, outMatrix, aspectRatio);
+
+	auto* points2 = new double[nPoints * coordinatesPerPoint];
+	for (auto i = 0; i < nPoints * coordinatesPerPoint; ++i)
+	{
+		points2[i] = randX(re);
+	}
+	optimizePattern(dMin, rC, areaDeltaMax, nPoints, points, points2, outMatrix, aspectRatio);
+
+	delete[] points;
+	delete[] points2;
 	delete[] outMatrix;
 }
