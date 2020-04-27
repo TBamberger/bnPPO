@@ -28,8 +28,12 @@
 void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 {
 	// Validate and retrieve parameters
-	if (nrhs != 6) // todo: 7
+	if (nrhs < 6 || nrhs > 7)
 		mexErrMsgIdAndTxt("BN:nrhs", "7 inputs required");
+
+	bool twoTiles = false;
+	if (nrhs == 7)
+		twoTiles = true;
 
 	if (nlhs != 1)
 		mexErrMsgIdAndTxt("BN:nlhs", "One output required");
@@ -59,16 +63,6 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 		const size_t nColsIn = mxGetN(prhs[4]);
 		const size_t nRowsIn = mxGetM(prhs[4]);
 
-
-		// todo
-		//if (!mxIsDouble(prhs[6]) || mxGetN(prhs[6]) != 2)
-		//	mexErrMsgIdAndTxt("BN:notDouble", "point coordinates have to be a Nx2 matrix of doubles");
-
-		/* todo double* inMatrixFixedTile = mxGetPr(prhs[6]);
-
-		if (mxGetM(prhs[6]) != nRowsIn)
-			mexErrMsgIdAndTxt("BN:incompatibleTileSize", "fixed and optimized tile need to have the same number of points");*/
-
 		// Print input matrix elements
 		//for (mwIndex i = 0; i < nRowsIn; ++i)
 		//{
@@ -77,10 +71,26 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 		//    printf("index %d, element (%f %f)\n", xValIndex, inMatrix[xValIndex], inMatrix[xValIndex + nColsIn]); // MATLAB uses column major order for matrices
 		//}
 
-		plhs[0] = mxCreateDoubleMatrix(static_cast<mwSize>(nRowsIn), static_cast<mwSize>(nColsIn), mxREAL);
+		if (twoTiles)
+			plhs[0] = mxCreateDoubleMatrix(static_cast<mwSize>(nRowsIn) * 2, static_cast<mwSize>(nColsIn), mxREAL);
+		else
+			plhs[0] = mxCreateDoubleMatrix(static_cast<mwSize>(nRowsIn), static_cast<mwSize>(nColsIn), mxREAL);
 		double* outMatrix = mxGetPr(plhs[0]);
-		// todo optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, inMatrixFixedTile, outMatrix, aspectRatio);
-		optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, outMatrix, aspectRatio);
+		if (twoTiles)
+		{
+			if (!mxIsDouble(prhs[6]) || mxGetN(prhs[6]) != 2)
+				mexErrMsgIdAndTxt("BN:notDouble", "point coordinates have to be a Nx2 matrix of doubles");
+
+			double* inMatrixFixedTile = mxGetPr(prhs[6]);
+
+			if (mxGetM(prhs[6]) != nRowsIn)
+				mexErrMsgIdAndTxt("BN:incompatibleTileSize", "fixed and optimized tile need to have the same number of points");
+			optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, inMatrixFixedTile, outMatrix, aspectRatio);
+		}
+		else
+		{
+			optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, outMatrix, aspectRatio);
+		}
 		// Generate blue noise
 	}
 	else

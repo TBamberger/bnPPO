@@ -256,6 +256,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : Point
 
 PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, double aspectRatio) : PointSet(nPoints, aspectRatio) // todo: 
 {
+	twoTiles = true;
 	dts.resize(3);
 	arrangements.resize(3);
 

@@ -21,7 +21,8 @@ class PointSet
 	double ONE_Y;
 	double HALF_X;
 	double HALF_Y;
-	Point marginBL, marginTR;                                                   // Points within these margins affect points in the main replica
+	Point marginBL, marginTR;               // Points within these margins affect points in the main replica
+	bool twoTiles = false;                  // true if two tiles are optimized at once
 
 	int maxIterations = 5000;
 
@@ -116,17 +117,47 @@ public:
 	/// @ return: Iteration count until convergence. -1 if no convergence until the specified maximum iteration.
 	int ppo();
 
+	void printCoordinates(Point p)
+	{
+		std::cout << p.x() << ", " << p.y() << std::endl;
+	}
+	
 	void PointSet::getPoints(double* outMatrix)
 	{
-		auto arrangement = arrangements[0]; // contains ht points of tile 0 by convention
-		auto row = 0;
-		for (auto replicaId : arrangement.replicaIdsToIterate)
+		if (twoTiles) // points of both point sets are returned in one matrix
 		{
-			Point p = getMainReplica(getPoint(replicaId));
+			auto arrangement = arrangements[0]; // contains ht points of tile 0 by convention
+			auto row = 0;
+			for (auto replicaId : arrangement.replicaIdsToIterate)
+			{
+				Point p = getMainReplica(getPoint(replicaId));
+				printCoordinates(p);
+				outMatrix[row] = p.x();
+				outMatrix[2*n + row] = p.y();
+				++row;
+			}
+			arrangement = arrangements[1];
+			for (auto replicaId : arrangement.replicaIdsToIterate)
+			{
+				Point p = getMainReplica(getPoint(replicaId));
+				printCoordinates(p);
+				outMatrix[row] = p.x();
+				outMatrix[2*n + row] = p.y();
+				++row;
+			}
+		}
+		else
+		{
+			auto arrangement = arrangements[0]; // contains ht points of tile 0 by convention
+			auto row = 0;
+			for (auto replicaId : arrangement.replicaIdsToIterate)
+			{
+				Point p = getMainReplica(getPoint(replicaId));
 
-			outMatrix[row] = p.x();
-			outMatrix[n + row] = p.y();
-			++row;
+				outMatrix[row] = p.x();
+				outMatrix[n + row] = p.y();
+				++row;
+			}
 		}
 	}
 };

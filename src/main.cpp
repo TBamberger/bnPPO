@@ -1,6 +1,7 @@
 #include "ppo.h"
 
 #include <random>
+#include <iostream>
 
 int main()
 {
@@ -10,7 +11,7 @@ int main()
 
 	const auto nPoints = 100;
 	const auto coordinatesPerPoint = 2; // 2D
-	auto* outMatrix = new double[nPoints * coordinatesPerPoint];
+	auto* outMatrix = new double[nPoints * coordinatesPerPoint * 2];
 
 	const auto initType = 0;
 	const auto aspectRatio = 1.0;
@@ -32,6 +33,11 @@ int main()
 		points2[i] = randX(re);
 	}
 	optimizePattern(dMin, rC, areaDeltaMax, nPoints, points, points2, outMatrix, aspectRatio);
+
+	for (auto i = 0; i < nPoints * coordinatesPerPoint * 2; ++i)
+	{
+		std::cout << i << ": " << outMatrix[i] << std::endl;
+	}
 
 	delete[] points;
 	delete[] points2;
