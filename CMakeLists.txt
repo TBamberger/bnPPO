@@ -33,14 +33,3 @@ target_link_libraries(blueNoiseStandalone CGAL::CGAL)
 
 target_include_directories(blueNoiseStandalone PRIVATE ${Python_INCLUDE_DIRS} ${Python_NumPy_INCLUDE_DIRS})
 target_link_libraries(blueNoiseStandalone Python::Python Python::NumPy)
-
-message(STATUS ${Python_LIBRARY_DIRS})
-message(STATUS ${Python_RUNTIME_LIBRARY_DIRS})
-
-message(STATUS ${Python_LIBRARIES})
-
-message(STATUS ${Python_INCLUDE_DIRS})
-message(STATUS ${Python_NumPy_INCLUDE_DIRS})
-
-message(STATUS ${Python3_INCLUDE_DIRS})
-message(STATUS ${Python3_NumPy_INCLUDE_DIRS})

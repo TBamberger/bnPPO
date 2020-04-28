@@ -1,10 +1,5 @@
 #include "pointSet.h"
 
-#define FIXED_SEED // If this is defined a fixed seed is used for RNG to achieve reproducible point sets; uses random seed otherwise
-
-// ensure that points don't move out of their tiles!!! Can be accompished by checking if they would moveInTile out of tht tile in the move function
-// ensure that I keep the correct points in the center tile!!!
-
 void optimizePattern(double dMin, double rC, double areaDeltaMax, PointSet&& ps, double* outMatrix, double aspectRatio)
 {
 	ps.setdmin(dMin);

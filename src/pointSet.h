@@ -10,7 +10,6 @@ class PointSet
 	std::uniform_real_distribution<> randX; // Uniform random numbers over the whole domain in x direction
 	std::uniform_real_distribution<> randY; // Uniform random numbers over the whole domain in x direction
 
-	// todo: unchecked:
 	int n;
 	double dHex;                            // Reference spacing of hexagonal packing.
 	double rel_dmin = 0.87;                 // Relative minimum distance between points; twice the conflict radius
@@ -45,7 +44,6 @@ class PointSet
 		std::vector<size_t> replicaIdsToIterate;
 	};
 
-	// todo: consider using fixed size containers where applicable
 	std::vector<Replica> replicas;
 	std::vector<Arrangement> arrangements;
 	std::vector<Site> sites;
@@ -55,10 +53,10 @@ class PointSet
 
 	/// @return: The point in the center tile
 	Point getMainReplica(const Point& p) const;
-	
+
 	void moveSite(size_t siteId, Point targetPoint);
 	void moveSite(size_t siteId, Vector shift);
-	
+
 	void coverage(size_t replicaId);
 	void conflict(size_t replicaId);
 	void capacity(size_t replicaId);
@@ -84,17 +82,12 @@ public:
 	void setdmin(double d) { rel_dmin = d; };                                   // Set target NND for spring().
 	void setRc(double r) { rel_rc = r; };
 	void set_sdA(double sd) { sdA = sd; };
-	
+
 	/// @ return: Iteration count until convergence. -1 if no convergence until the specified maximum iteration.
 	int ppo();
 
-	void printCoordinates(Point p)
-	{
-		std::cout << p.x() << ", " << p.y() << std::endl;
-	}
-
 	void minDistanceCheck();
-	
+
 	void PointSet::getPoints(double* outMatrix)
 	{
 		if (twoTiles) // points of both point sets are returned in one matrix
@@ -106,7 +99,7 @@ public:
 				Point p = getMainReplica(getPoint(replicaId));
 				//printCoordinates(p);
 				outMatrix[row] = p.x();
-				outMatrix[2*n + row] = p.y();
+				outMatrix[2 * n + row] = p.y();
 				++row;
 			}
 			arrangement = arrangements[1];
@@ -115,7 +108,7 @@ public:
 				Point p = getMainReplica(getPoint(replicaId));
 				//printCoordinates(p);
 				outMatrix[row] = p.x();
-				outMatrix[2*n + row] = p.y();
+				outMatrix[2 * n + row] = p.y();
 				++row;
 			}
 		}

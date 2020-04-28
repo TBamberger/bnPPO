@@ -5,11 +5,11 @@
 int main()
 {
 	const auto dMin = 0.85;
-	const auto rC = 0.67;
+	const auto rC = 3;// 0.67;
 	const auto areaDeltaMax = -1;
 
-	const auto nPoints = 107;
-	const auto coordinatesPerPoint = 2; // 2D
+	const auto nPoints = 300;
+	const auto coordinatesPerPoint = 2;
 	auto* outMatrix = new double[nPoints * coordinatesPerPoint * 2];
 
 	const auto initType = 0;
@@ -32,11 +32,6 @@ int main()
 		points2[i] = randX(re);
 	}
 	optimizePattern(dMin, rC, areaDeltaMax, nPoints, points, points2, outMatrix, aspectRatio);
-
-	//for (auto i = 0; i < nPoints * coordinatesPerPoint * 2; ++i)
-	//{
-	//	std::cout << i << ": " << outMatrix[i] << std::endl;
-	//}
 
 	delete[] points;
 	delete[] points2;

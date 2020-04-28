@@ -6,12 +6,7 @@
 #include <CGAL/Delaunay_triangulation_2.h>
 
 #include <vector>
-#include <iostream> // todo: remove
-
-// todo: change to function
-#define VL(x) sqrt((x).squared_length())
-
-#define FIXED_SEED // If this is defined a fixed seed is used for RNG to achive reproducible point sets; uses random seed otherwise
+#include <iostream>
 
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
 using Point = K::Point_2;
@@ -38,13 +33,18 @@ using FC = DT::Face_circulator;
 
 const double epsilon = 1e-12;
 
+inline double length(const Vector& v)
+{
+	return sqrt(v.squared_length());
+}
+
 inline bool isInRect(const Point& p, const Point& bl, const Point& tr) // todo: test
 {
 	return bl.x() <= p.x() && bl.y() <= p.y() &&
 		p.x() < tr.x() && p.y() < tr.y();
 }
 
-inline double triangleType(Point& p1, Point& p2, Point& p3) // todo: return enum
+inline double triangleType(Point& p1, Point& p2, Point& p3) // todo: change return type to enum
 {
 	auto sq1 = (p3 - p2).squared_length();
 	auto sq2 = (p1 - p3).squared_length();
@@ -74,7 +74,11 @@ inline double minEdgeLength(DT& dt)
 		const double edgeLength = std::sqrt((p1 - p2).squared_length());
 		if (edgeLength < minEdgeLength)
 			minEdgeLength = edgeLength;
-		//std::cout << "edgeLength: " << edgeLength << "\n";
 	}
 	return minEdgeLength;
+}
+
+inline void printCoordinates(Point p)
+{
+	std::cout << p.x() << ", " << p.y() << std::endl;
 }
