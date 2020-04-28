@@ -12,7 +12,7 @@ class PointSet
 
 	// todo: unchecked:
 	int n;
-	double dhex;                            // Reference spacing of hexagonal packing.
+	double dHex;                            // Reference spacing of hexagonal packing.
 	double rel_dmin = 0.87;                 // Relative minimum distance between points; twice the conflict radius
 	double rel_rc = 0.65;                   // Relative maximum coverage radius.
 	double sdA = 0.038600518;               // Target standard deviation of cell areas; default is from Schlomer thesis p 64.
@@ -53,7 +53,7 @@ class PointSet
 
 	Point& getPoint(size_t replicaId);
 
-	/// Returns the point in the center tile
+	/// @return: The point in the center tile
 	Point getMainReplica(const Point& p) const;
 	
 	void moveSite(size_t siteId, Point targetPoint);
@@ -63,40 +63,11 @@ class PointSet
 	void conflict(size_t replicaId);
 	void capacity(size_t replicaId);
 
-	//Point PointSet::setSite(int index, Point p) {                        // Set location of the indexed point (in t-domain) and insert it in triangulation
-	//	p = getMainReplica(p);
-	//	sites[index].p = p;                                               // Save a handy copy of point coordinates
-	//	sites[index].isStable = false;
-	//	for (int i = 0; i < 9; i++)
-	//	{
-	//		sites[index].vh[i] = dt.insert(createReplica(p, i));       // insert replica in triangulation and keep handle to it
-	//		sites[index].vh[i]->info().id = index;                        // Point the DT point back to map entry
-	//	}
-	//	return p;
-	//}
+	Point createReplica(Point& p, int i) const;
 
-	Point createReplica(Point& p, int i) {                                    // Find one of the 9 replicas of a point
-		i = (i + 4) % 9;                                                // We make the middle replica at index 0
-		double x = p.x() + (i % 3 - 1) * ONE_X;                         // Add -ONE, 0, or ONE to x
-		double y = p.y() + (i / 3 - 1) * ONE_Y;                         // Same for y
-		return Point(x, y);
-	}
+	/// @return: Randomly ordered vector with the integers from 0 to n-1
+	std::vector<size_t> shuffle(const size_t n);
 
-	// @return: Randomly ordered list with the integers from 0 to n-1
-	unsigned* PointSet::shuffle(const unsigned n)
-	{
-		const auto randMax = std::uniform_int_distribution<>();
-		unsigned* list = new unsigned[n];
-		for (int i = 0; i < n; i++)
-			list[i] = i;
-		for (unsigned i = 0; i < n - 1; i++)
-		{
-			unsigned r = i + randMax(re) % (n - 1 - i);
-			std::swap(list[i], list[r]);
-		}
-		return list;
-	}
-	
 	PointSet(int number_of_points, double aspectRatio);
 public:
 	// Copying is not allowed since this would invalidate all vertex-, face- and edge-handles when the triangulation is copied
@@ -106,7 +77,7 @@ public:
 	PointSet(PointSet&&);
 	PointSet& operator=(PointSet&&) = default;
 
-	PointSet(int number_of_points, int initType, double aspectRatio); // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid
+	PointSet(int numberOfPoints, int initType, double aspectRatio); // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid
 	PointSet(int nPoints, double* inputPoints, double aspectRatio);
 	PointSet(int nPoints, double* inputPoints, double* inputPointsFixedTile, double aspectRatio);
 
@@ -121,6 +92,8 @@ public:
 	{
 		std::cout << p.x() << ", " << p.y() << std::endl;
 	}
+
+	void minDistanceCheck();
 	
 	void PointSet::getPoints(double* outMatrix)
 	{
@@ -131,7 +104,7 @@ public:
 			for (auto replicaId : arrangement.replicaIdsToIterate)
 			{
 				Point p = getMainReplica(getPoint(replicaId));
-				printCoordinates(p);
+				//printCoordinates(p);
 				outMatrix[row] = p.x();
 				outMatrix[2*n + row] = p.y();
 				++row;
@@ -140,7 +113,7 @@ public:
 			for (auto replicaId : arrangement.replicaIdsToIterate)
 			{
 				Point p = getMainReplica(getPoint(replicaId));
-				printCoordinates(p);
+				//printCoordinates(p);
 				outMatrix[row] = p.x();
 				outMatrix[2*n + row] = p.y();
 				++row;
@@ -158,6 +131,20 @@ public:
 				outMatrix[n + row] = p.y();
 				++row;
 			}
+		}
+	}
+
+	void PointSet::getPoints(Arrangement& arrangement, std::vector<double>& xOut, std::vector<double>& yOut)
+	{
+		xOut.resize(arrangement.replicaIdsToIterate.size());
+		yOut.resize(arrangement.replicaIdsToIterate.size());
+		auto i = 0;
+		for (auto replicaId : arrangement.replicaIdsToIterate)
+		{
+			Point p = getMainReplica(getPoint(replicaId));
+			xOut[i] = p.x();
+			yOut[i] = p.y();
+			i++;
 		}
 	}
 };

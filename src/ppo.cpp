@@ -1,7 +1,5 @@
 #include "pointSet.h"
 
-#include <iostream>
-
 #define FIXED_SEED // If this is defined a fixed seed is used for RNG to achieve reproducible point sets; uses random seed otherwise
 
 // ensure that points don't move out of their tiles!!! Can be accompished by checking if they would moveInTile out of tht tile in the move function
@@ -32,7 +30,6 @@ void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int n
 
 void optimizePattern(double dMin, double rC, double areaDeltaMax, unsigned int nPoints, double* inMatrix, double* inMatrixFixedTile, double* outMatrix, double aspectRatio)
 {
-	std::cout << "Starting PPO" << std::endl;
 	PointSet ps(nPoints, inMatrix, inMatrixFixedTile, aspectRatio);
 	optimizePattern(dMin, rC, areaDeltaMax, std::move(ps), outMatrix, aspectRatio);
 }

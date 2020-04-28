@@ -1,5 +1,11 @@
 #include "pointSet.h"
 
+//#include "matplotlibcpp.h"
+//
+//#include <chrono>
+//#include <thread>
+//namespace plt = matplotlibcpp;
+
 Point& PointSet::getPoint(const size_t replicaId)
 {
 	return replicas[replicaId].vh->point();
@@ -23,16 +29,18 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 
 	for (auto replicaId : sites[siteId].replicaIds)
 	{
-		auto vh = replicas[replicaId].vh;
+		auto& replica = replicas[replicaId];
+		auto& dt = dts[replica.dtId];
+		auto vh = replica.vh;
 		auto newPosition = vh->point() + shift;
-		replicas[replicaId].vh = dts[replicas[replicaId].dtId].move(vh, newPosition);
+		replica.vh = dt.move(vh, newPosition);
 
 		// Mark neighbors unstable (has to be done for each replica since replicas might be in different triangulations
 		// and therefore have different neighbors).
-		VC vc = dts[replicas[replicaId].dtId].incident_vertices(vh), done(vc);
+		VC vc = dt.incident_vertices(vh), done(vc);
 		do
 		{
-			if (!dts[replicas[replicaId].dtId].is_infinite(vc))
+			if (!dt.is_infinite(vc))
 				sites[vc->info().id].becomeStable = false;
 		}
 		while (++vc != done);
@@ -43,10 +51,10 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 
 void PointSet::moveSite(size_t siteId, const Vector shift)
 {
-	if (shift.squared_length() > epsilon)
-	{
-		moveSite(siteId, getPoint(sites[siteId].replicaIds[0]) + shift);
-	}
+	//if (shift.squared_length() > epsilon)
+	//{
+	moveSite(siteId, getPoint(sites[siteId].replicaIds[0]) + shift);
+	//}
 }
 
 void PointSet::coverage(size_t replicaId)
@@ -55,7 +63,7 @@ void PointSet::coverage(size_t replicaId)
 	auto& dt = dts[replica.dtId];
 	auto& p = getPoint(replicaId);
 
-	const auto rc = rel_rc * dhex;
+	const auto rc = rel_rc * dHex;
 	int id[30];
 	double scale[30];
 	Vector edge[30];
@@ -99,7 +107,7 @@ void PointSet::conflict(size_t replicaId)
 	auto& dt = dts[replica.dtId];
 	auto& p = getPoint(replicaId);
 
-	const double dMin = rel_dmin * dhex;
+	const double dMin = rel_dmin * dHex;
 	bool conflict[30];
 	Vector shift[30];
 	int id[30];
@@ -173,6 +181,30 @@ void PointSet::capacity(size_t replicaId)
 	}
 }
 
+Point PointSet::createReplica(Point& p, int i) const
+{                                                 // Find one of the 9 replicas of a point
+	i = (i + 4) % 9;                              // We make the middle replica at index 0
+	const double x = p.x() + (i % 3 - 1) * ONE_X; // Add -ONE, 0, or ONE to x
+	const double y = p.y() + (i / 3 - 1) * ONE_Y; // Same for y
+	return Point(x, y);
+}
+
+std::vector<size_t> PointSet::shuffle(const size_t n)
+{
+	const auto randMax = std::uniform_int_distribution<size_t>();
+	std::vector<size_t> v;
+	v.resize(n);
+	for (size_t i = 0; i < n; ++i)
+	{
+		v[i] = i;
+	}
+	for (size_t i = 0; i < n - 1; ++i)
+	{
+		std::swap(v[i], v[i + randMax(re) % (n - 1 - i)]);
+	}
+	return v;
+}
+
 PointSet::PointSet(int number_of_points, double aspectRatio) :
 #ifdef FIXED_SEED
 	re(12345)
@@ -187,7 +219,7 @@ PointSet::PointSet(int number_of_points, double aspectRatio) :
 	HALF_Y = 0.5 * ONE_Y;
 	randX = std::uniform_real_distribution<>(0, ONE_X);
 	randY = std::uniform_real_distribution<>(0, ONE_Y);
-	dhex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                           // Maximum packing distance
+	dHex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                           // Maximum packing distance
 	double margin = std::min(10 / sqrt(n), 1.0);                              // Margin for toroidal domain. Heuristically, use 10 layers of points.
 	marginBL = Point(-margin * ONE_X, -margin * ONE_Y);                       // Bottom-left of primary period + margin
 	marginTR = Point((1 + margin) * ONE_X, (1 + margin) * ONE_Y);             // Top-right. In our convention BL is included, TR is excluded
@@ -353,6 +385,18 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 
 int PointSet::ppo()
 {
+	//plt::figure_size(1200, 780);
+	//std::vector<double> x;
+	//std::vector<double> y;
+	//getPoints(arrangements[0], x, y);
+	//plt::scatter(x, y);
+	//plt::xlim(0.0, ONE_X);
+	//plt::ylim(0.0, ONE_Y);
+	//plt::pause(0.1);
+	//plt::draw();
+	//plt::show(false);
+	
+	
 	allStable = false;
 	for (auto& site : sites) site.isStable = false;
 
@@ -363,7 +407,7 @@ int PointSet::ppo()
 		allStable = true; // Assume the point set will be found stable. (This will be set to false as soon as a point is moved)
 		for (const auto& arrangement : arrangements)
 		{
-			unsigned* order = shuffle(arrangement.replicaIdsToIterate.size());
+			auto order = shuffle(arrangement.replicaIdsToIterate.size());
 			for (size_t i = 0; i < arrangement.replicaIdsToIterate.size(); ++i)
 			{
 				auto iRandom = order[i];
@@ -372,11 +416,34 @@ int PointSet::ppo()
 				conflict(replicaId);
 				capacity(replicaId);
 			}
-			delete[] order;
 		}
 		
 		for (auto& site : sites) site.isStable = site.becomeStable;
 		std::cout << iteration << std::endl;
+		minDistanceCheck();
+		// Display points
+		//getPoints(arrangements[0], x, y);
+		//plt::show(false);
+		//plt::pause(0.1);
+		//std::this_thread::sleep_for(std::chrono::seconds(1));
 	}
+	minDistanceCheck();
+	
 	return allStable ? iteration : -1;
+}
+
+void PointSet::minDistanceCheck()
+{
+	const auto dMin = rel_dmin * dHex;
+	std::cout << "Allowed min edge length: " << dMin << "\n";
+	std::cout << "The triangulations have the following edge lengths: \n";
+	for (auto& dt :dts)
+	{
+		const auto mel = minEdgeLength(dt);
+		std::cout << mel;
+		if (mel < dMin)
+			std::cout << " (dMin not satisfied)";
+		std::cout << "\n";
+	}
+	std::cout.flush();
 }

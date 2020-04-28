@@ -6,6 +6,7 @@
 #include <CGAL/Delaunay_triangulation_2.h>
 
 #include <vector>
+#include <iostream> // todo: remove
 
 // todo: change to function
 #define VL(x) sqrt((x).squared_length())
@@ -60,4 +61,20 @@ inline double triangleType(FC& fc) // todo: return enum
 		fc->vertex(1)->point(),
 		fc->vertex(2)->point()
 	);
+}
+
+/// @return: Minimum edge length in the dt
+inline double minEdgeLength(DT& dt)
+{
+	auto minEdgeLength = std::numeric_limits<double>::max();
+	for (const auto& edge : dt.finite_edges())
+	{
+		Point p1 = edge.first->vertex(DT::cw(edge.second))->point();
+		Point p2 = edge.first->vertex(DT::ccw(edge.second))->point();
+		const double edgeLength = std::sqrt((p1 - p2).squared_length());
+		if (edgeLength < minEdgeLength)
+			minEdgeLength = edgeLength;
+		//std::cout << "edgeLength: " << edgeLength << "\n";
+	}
+	return minEdgeLength;
 }
