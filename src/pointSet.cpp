@@ -65,12 +65,11 @@ void PointSet::coverage(size_t replicaId)
 	auto& p = getPoint(replicaId);
 
 	const auto rc = rel_rc * dHex;
-	
-	// auto nIncidentVertices = replica.vh->degree(); reserve
-	
-	int id[30];
-	double scale[30];
-	Vector edge[30];
+
+	const auto vhDegree = replica.vh->degree();
+	std::vector<int> id(vhDegree);
+	std::vector<double> scale(vhDegree);
+	std::vector<Vector> edge(vhDegree);
 	auto m = 0;
 
 	FC fc = dt.incident_faces(replica.vh);
@@ -94,12 +93,12 @@ void PointSet::coverage(size_t replicaId)
 		m++;
 	} while (++fc != done);
 
-	for (auto i = 0; i < m; i++)
+	for (auto i = 0u; i < vhDegree; i++)
 	{
-		const double scl = std::min(scale[i], scale[(i + 1) % m]);
+		const double scl = std::min(scale[i], scale[(i + 1u) % vhDegree]);
 		if (scl < 1)
 		{
-			Vector shift = (1 - scl) * edge[i];
+			const Vector shift = (1 - scl) * edge[i];
 			moveSite(id[i], shift);
 		}
 	}
@@ -112,9 +111,12 @@ void PointSet::conflict(size_t replicaId)
 	auto& p = getPoint(replicaId);
 
 	const double dMin = rel_dmin * dHex;
-	bool conflict[30];
-	Vector shift[30];
-	int id[30];
+
+	const auto vhDegree = replica.vh->degree();
+	std::vector<bool> conflict(vhDegree);
+	std::vector<Vector> shift(vhDegree);
+	std::vector<int> id(vhDegree);
+	
 	int m = 0;
 	VC vc = dt.incident_vertices(replica.vh);
 	const VC done(vc);
@@ -122,16 +124,20 @@ void PointSet::conflict(size_t replicaId)
 	{
 		Vector edge = vc->point() - p;
 		double l = length(edge);
-		if (l < dMin) {
+		if (l < dMin)
+		{
 			conflict[m] = true;
 			shift[m] = (1.001 * dMin / l - 1) * edge;
 			id[m] = vc->info().id;
 		}
-		else conflict[m] = false;
+		else
+		{
+			conflict[m] = false;
+		}
 		m++;
 	} while (++vc != done);
 
-	for (auto i = 0; i < m; i++)
+	for (auto i = 0u; i < vhDegree; i++)
 	{
 		if (conflict[i]) moveSite(id[i], shift[i]);
 	}
@@ -143,15 +149,16 @@ void PointSet::capacity(size_t replicaId)
 	auto& dt = dts[replica.dtId];
 	auto& p = getPoint(replicaId);
 
-	double d[20];    // Distance to neighbor (= 2 x distance to Voronoi edge)
-	double el[20];   // length of the voronoi edges
+	const auto vhDegree = replica.vh->degree();
+	std::vector<double> d(vhDegree);    // Distance to neighbor (= 2 x distance to Voronoi edge)
+	std::vector<double> el(vhDegree);   // length of the voronoi edges
+	std::vector<Vector> dir(vhDegree);  // Direction vectors to neighbors
+	std::vector<int> id(vhDegree);      // Id's of neighbors. We can't use the circulator for updating
 	double area = 0; // Area of Voronoi cell
 	FC fc2 = dt.incident_faces(replica.vh), fc1(fc2++);               // fc1 and fc2 are two consecutive (ccw) faces incident to current vertex
 	VC vc = dt.incident_vertices(replica.vh, fc2);                    // The vertex sharing fc1 and fc2 with v[i].vh
 	const VC done(vc);
-	int m = 0;                                                        // Number of neighbors
-	Vector dir[20];                                                   // Direction vectors to neighbors
-	int id[20];                                                       // Id's of neighbors. We can't use the circulator for updating
+	int m = 0;
 	do
 	{
 		Point c1 = dt.circumcenter(fc1), c2 = dt.circumcenter(fc2);   // Circumcenters of faces are endpoints of Voronoi cell edge
@@ -171,12 +178,12 @@ void PointSet::capacity(size_t replicaId)
 	if (fabs(dA) > sdA)
 	{
 		double sum_w = 0;
-		for (int j = 0; j < m; j++)
+		for (auto j = 0u; j < vhDegree; j++)
 		{
 			sum_w += el[j] * el[j];
 		}
 		const double pressure = -2 * dA / sum_w; // pressure per unit length of edges
-		for (auto j = 0; j < m; j++)
+		for (auto j = 0u; j < vhDegree; j++)
 		{
 			const Vector force = pressure * el[j] * dir[j];
 			moveSite(id[j], force);
