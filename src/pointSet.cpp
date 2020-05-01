@@ -65,6 +65,9 @@ void PointSet::coverage(size_t replicaId)
 	auto& p = getPoint(replicaId);
 
 	const auto rc = rel_rc * dHex;
+	
+	// auto nIncidentVertices = replica.vh->degree(); reserve
+	
 	int id[30];
 	double scale[30];
 	Vector edge[30];
