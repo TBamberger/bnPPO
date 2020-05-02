@@ -2,6 +2,7 @@
 #include "ppo.h"
 #include <cstring>
 #include <iostream>
+#include <stdexcept>
 
 // Input from MATLAB - received via prhs (pass params in this order):
 // 0: dMin (which is linked to r_f / conflict radius / min distance between points - relative to r_max,
@@ -31,9 +32,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 	if (nrhs < 6 || nrhs > 7)
 		mexErrMsgIdAndTxt("BN:nrhs", "7 inputs required");
 
-	bool twoTiles = false;
-	if (nrhs == 7)
-		twoTiles = true;
+	const bool twoTiles = nrhs == 7;
 
 	if (nlhs != 1)
 		mexErrMsgIdAndTxt("BN:nlhs", "One output required");
@@ -63,33 +62,41 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 		const size_t nColsIn = mxGetN(prhs[4]);
 		const size_t nRowsIn = mxGetM(prhs[4]);
 
-		// Print input matrix elements
-		//for (mwIndex i = 0; i < nRowsIn; ++i)
-		//{
-		//    mwIndex subs[2] = {i, 0};
-		//    mwIndex xValIndex = mxCalcSingleSubscript(prhs[4], 2, subs);
-		//    printf("index %d, element (%f %f)\n", xValIndex, inMatrix[xValIndex], inMatrix[xValIndex + nColsIn]); // MATLAB uses column major order for matrices
-		//}
-
 		if (twoTiles)
 			plhs[0] = mxCreateDoubleMatrix(static_cast<mwSize>(nRowsIn) * 2, static_cast<mwSize>(nColsIn), mxREAL);
 		else
 			plhs[0] = mxCreateDoubleMatrix(static_cast<mwSize>(nRowsIn), static_cast<mwSize>(nColsIn), mxREAL);
 		double* outMatrix = mxGetPr(plhs[0]);
+		
 		if (twoTiles)
 		{
 			if (!mxIsDouble(prhs[6]) || mxGetN(prhs[6]) != 2)
 				mexErrMsgIdAndTxt("BN:notDouble", "point coordinates have to be a Nx2 matrix of doubles");
 
-			double* inMatrixFixedTile = mxGetPr(prhs[6]);
+			double* inMatrix2 = mxGetPr(prhs[6]);
 
 			if (mxGetM(prhs[6]) != nRowsIn)
 				mexErrMsgIdAndTxt("BN:incompatibleTileSize", "fixed and optimized tile need to have the same number of points");
-			optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, inMatrixFixedTile, outMatrix, aspectRatio);
+
+			try
+			{
+				optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, inMatrix2, outMatrix, aspectRatio);
+			}
+			catch (std::invalid_argument& e)
+			{
+				mexErrMsgIdAndTxt("BN:invalidInput", e.what());
+			}
 		}
 		else
 		{
-			optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, outMatrix, aspectRatio);
+			try
+			{
+				optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, outMatrix, aspectRatio);
+			}
+			catch (std::invalid_argument& e)
+			{
+				mexErrMsgIdAndTxt("BN:invalidInput", e.what());
+			}
 		}
 		// Generate blue noise
 	}
@@ -104,25 +111,33 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 		plhs[0] = mxCreateDoubleMatrix(static_cast<mwSize>(nPoints), static_cast<mwSize>(nCols), mxREAL);
 		double* outMatrix = mxGetPr(plhs[0]);
 
-		if (std::strcmp(initType, "random") == 0)
+		try
 		{
-			optimizePattern(rF, rC, capacityConstraint, nPoints, 0, outMatrix, aspectRatio);
+			if (std::strcmp(initType, "random") == 0)
+			{
+				optimizePattern(rF, rC, capacityConstraint, nPoints, 0, outMatrix, aspectRatio);
+			}
+			else if (std::strcmp(initType, "darts") == 0)
+			{
+				mexErrMsgIdAndTxt("BN:initType", "Init type not yet supported");
+			}
+			else if (std::strcmp(initType, "jittered") == 0)
+			{
+				mexErrMsgIdAndTxt("BN:initType", "Init type not yet supported");
+			}
+			else if (std::strcmp(initType, "grid") == 0)
+			{
+				mexErrMsgIdAndTxt("BN:initType", "Init type not yet supported");
+			}
+			else
+			{
+				mexErrMsgIdAndTxt("BN:initType", "Unknown init type");
+			}
 		}
-		else if (std::strcmp(initType, "darts") == 0)
+		catch (std::invalid_argument& e)
 		{
-			mexErrMsgIdAndTxt("BN:initType", "Init type not yet supported");
-		}
-		else if (std::strcmp(initType, "jittered") == 0)
-		{
-			mexErrMsgIdAndTxt("BN:initType", "Init type not yet supported");
-		}
-		else if (std::strcmp(initType, "grid") == 0)
-		{
-			mexErrMsgIdAndTxt("BN:initType", "Init type not yet supported");
-		}
-		else
-		{
-			mexErrMsgIdAndTxt("BN:initType", "Unknown init type");
+			mexErrMsgIdAndTxt("BN:invalidInput", e.what());
 		}
 	}
+	delete[] initType;
 }

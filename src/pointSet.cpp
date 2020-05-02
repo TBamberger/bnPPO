@@ -5,6 +5,7 @@
 #include "pointSet.h"
 
 #include <cassert>
+#include <stdexcept>
 
 #ifdef PLOT_POINTS
 #include "matplotlibcpp.h"
@@ -32,18 +33,18 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 	const auto currentPoint = getMainReplica(getPoint(sites[siteId].replicaIds[0])); // todo: getMainReplica könnte ich mir hier sparen wenn ich sicherstelle, dass id 0 immer in der mittleren Kachel ist
 	targetPoint = getMainReplica(targetPoint);
 	const Vector shift = targetPoint - currentPoint;
+	assert(isInMainReplica(currentPoint + shift));
 
 	for (auto replicaId : sites[siteId].replicaIds)
 	{
 		auto& replica = replicas[replicaId];
 		auto& dt = dts[replica.dtId];
-		auto vh = replica.vh;
-		auto newPosition = vh->point() + shift;
-		replica.vh = dt.move(vh, newPosition);
+		auto newPosition = replica.vh->point() + shift;
+		replica.vh = dt.move(replica.vh, newPosition);
 
 		// Mark neighbors unstable (has to be done for each replica since replicas might be in different triangulations
 		// and therefore have different neighbors).
-		VC vc = dt.incident_vertices(vh), done(vc);
+		VC vc = dt.incident_vertices(replica.vh), done(vc);
 		do
 		{
 			if (!dt.is_infinite(vc))
@@ -226,6 +227,10 @@ PointSet::PointSet(int nPoints, double aspectRatio) :
 	re(std::random_device{}())
 #endif // FIXED_SEED
 {
+	if (nPoints < 2)
+	{
+		throw std::invalid_argument("Can't work on less than two points.");
+	}
 	n = nPoints;                                                     // Number of points in one period
 	ONE_X = aspectRatio;
 	ONE_Y = 1;
@@ -278,6 +283,10 @@ PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : Point
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints[i], inputPoints[i + n]);
+		if (!isInMainReplica(p))
+		{
+			throw std::invalid_argument("Points need to be inside the domain (lower boundary inclusive, upper exclusive)");
+		}
 
 		Site site;
 		const auto siteId = sites.size();
@@ -308,6 +317,10 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints[i], inputPoints[i + n]);
+		if (!isInMainReplica(p))
+		{
+			throw std::invalid_argument("Points need to be inside the domain (lower boundary inclusive, upper exclusive)");
+		}
 		Site site;
 		const auto siteId = sites.size();
 
@@ -321,6 +334,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 			r.vh->info().id = siteId;
 			r.dtId = dtId;
 			replicas.push_back(r);
+			
 			site.replicaIds.push_back(replicaId);
 			if (j == 0) // replicas in center tile
 			{
@@ -345,6 +359,10 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints2[i], inputPoints2[i + n]);
+		if (!isInMainReplica(p))
+		{
+			throw std::invalid_argument("Points need to be inside the domain (lower boundary inclusive, upper exclusive)");
+		}
 		Site site;
 		const auto siteId = sites.size();
 
@@ -398,7 +416,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 	}
 	assert(nSeventeenReplicas == nPoints);
 	assert(nTenReplicas == nPoints);
-#endif
+#endif //NDEBUG
 }
 
 void PointSet::setDMin(double d)
@@ -434,6 +452,7 @@ int PointSet::ppo()
 			{
 				const auto iRandom = order[i];
 				const auto replicaId = arrangement.replicaIdsToIterate[iRandom];
+				
 				coverage(replicaId);
 				conflict(replicaId);
 				capacity(replicaId);
@@ -529,4 +548,9 @@ void PointSet::getPoints(Arrangement& arrangement, std::vector<double>& xOut, st
 		yOut[i] = p.y();
 		i++;
 	}
+}
+
+bool PointSet::isInMainReplica(const Point& p) const
+{
+	return 0 <= p.x() && p.x() < ONE_X && 0 <= p.y() && p.y() < ONE_Y;
 }

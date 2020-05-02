@@ -28,7 +28,7 @@ class PointSet
 	struct Replica
 	{
 		VH vh;
-		size_t dtId;
+		size_t dtId = -1;
 	};
 
 	struct Site
@@ -66,6 +66,7 @@ class PointSet
 	std::vector<size_t> shuffle(const size_t n);
 
 	PointSet(int nPoints, double aspectRatio);
+
 public:
 	// Copying is not allowed since this would invalidate all vertex-, face- and edge-handles when the triangulation is copied
 	PointSet(const PointSet&) = delete;
@@ -90,4 +91,16 @@ public:
 	void getPoints(double* outMatrix);
 
 	void getPoints(Arrangement& arrangement, std::vector<double>& xOut, std::vector<double>& yOut);
+
+	[[nodiscard]] bool isInMainReplica(const Point& p) const;
+
+	void printCoordinates(int arrangementId) // todo remove
+	{
+		auto& a = arrangements[arrangementId];
+		for (auto rId : a.replicaIdsToIterate)
+		{
+			auto& p = replicas[rId].vh->point();
+			std::cout << p.x() << ", " << p.y() << std::endl;
+		}
+	}
 };
