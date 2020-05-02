@@ -283,10 +283,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : Point
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints[i], inputPoints[i + n]);
-		if (!isInMainReplica(p))
-		{
-			throw std::invalid_argument("Points need to be inside the domain (lower boundary inclusive, upper exclusive)");
-		}
+		p = getMainReplica(p);
 
 		Site site;
 		const auto siteId = sites.size();
@@ -317,10 +314,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints[i], inputPoints[i + n]);
-		if (!isInMainReplica(p))
-		{
-			throw std::invalid_argument("Points need to be inside the domain (lower boundary inclusive, upper exclusive)");
-		}
+		p = getMainReplica(p);
 		Site site;
 		const auto siteId = sites.size();
 
@@ -359,10 +353,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints2[i], inputPoints2[i + n]);
-		if (!isInMainReplica(p))
-		{
-			throw std::invalid_argument("Points need to be inside the domain (lower boundary inclusive, upper exclusive)");
-		}
+		p = getMainReplica(p);
 		Site site;
 		const auto siteId = sites.size();
 
@@ -442,7 +433,9 @@ int PointSet::ppo()
 	auto iteration = 1; // todo: consider not counting the last iteration since it is only to check if all are stable
 	for (; iteration <= maxIterations && !allStable; ++iteration)
 	{
-		std::cout << "starting iteration" << iteration << std::endl;
+#ifdef PRINT_INFO
+		std::cout << "Iteration" << iteration << std::endl;
+#endif // PRINT_INFO
 		for (auto& site : sites) site.becomeStable = true;
 		allStable = true; // Assume the point set will be found stable. (This will be set to false as soon as a point is moved)
 		for (const auto& arrangement : arrangements)

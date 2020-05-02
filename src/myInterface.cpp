@@ -34,8 +34,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 
 	const bool twoTiles = nrhs == 7;
 
-	if (nlhs != 1)
-		mexErrMsgIdAndTxt("BN:nlhs", "One output required");
+	if (nlhs < 1 || nlhs > 2)
+		mexErrMsgIdAndTxt("BN:nlhs", "One or two outputs required");
 
 	for (int i = 0; i < 2; ++i)
 		if (!mxIsScalar(prhs[i]) || !mxIsDouble(prhs[i]))
@@ -53,6 +53,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 	if (mxGetString(prhs[3], initType, initTypeSize))
 		mexErrMsgIdAndTxt("BN:initType", "Can't retrieve init type");
 
+	int iterations = -1;
 	if (std::strcmp(initType, "specific") == 0)
 	{
 		if (!mxIsDouble(prhs[4]) || mxGetN(prhs[4]) != 2)
@@ -80,7 +81,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 
 			try
 			{
-				optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, inMatrix2, outMatrix, aspectRatio);
+				iterations = optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, inMatrix2, outMatrix, aspectRatio);
 			}
 			catch (std::invalid_argument& e)
 			{
@@ -91,7 +92,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 		{
 			try
 			{
-				optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, outMatrix, aspectRatio);
+				iterations = optimizePattern(rF, rC, capacityConstraint, nRowsIn, inMatrix, outMatrix, aspectRatio);
 			}
 			catch (std::invalid_argument& e)
 			{
@@ -115,7 +116,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 		{
 			if (std::strcmp(initType, "random") == 0)
 			{
-				optimizePattern(rF, rC, capacityConstraint, nPoints, 0, outMatrix, aspectRatio);
+				iterations = optimizePattern(rF, rC, capacityConstraint, nPoints, 0, outMatrix, aspectRatio);
 			}
 			else if (std::strcmp(initType, "darts") == 0)
 			{
@@ -140,4 +141,5 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 		}
 	}
 	delete[] initType;
+	plhs[1] = mxCreateDoubleScalar(static_cast<double>(iterations));
 }
