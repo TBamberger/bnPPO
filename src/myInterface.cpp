@@ -3,7 +3,7 @@
 #include <cstring>
 #include <iostream>
 
-// Input from MATLAB - revieved via prhs (pass params in this order):
+// Input from MATLAB - received via prhs (pass params in this order):
 // 0: dMin (which is linked to r_f / conflict radius / min distance between points - relative to r_max,
 //        therefore in range [0,1])
 // 1: r_c / coverage radius / max distance between a location in the domain and 

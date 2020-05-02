@@ -2,10 +2,10 @@
 
 int optimizePattern(double dMin, double rC, double areaDeltaMax, PointSet&& ps, double* outMatrix, double aspectRatio)
 {
-	ps.setdmin(dMin);
+	ps.setDMin(dMin);
 	ps.setRc(rC);
 	if (areaDeltaMax >= 0)
-		ps.set_sdA(areaDeltaMax);
+		ps.setSdA(areaDeltaMax);
 
 	const auto nIterations = ps.ppo();
 	ps.getPoints(outMatrix);

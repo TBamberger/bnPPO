@@ -28,6 +28,7 @@ Point PointSet::getMainReplica(const Point& p) const
 
 void PointSet::moveSite(size_t siteId, Point targetPoint)
 {
+	assert(0 <= siteId && siteId < sites.size());
 	const auto currentPoint = getMainReplica(getPoint(sites[siteId].replicaIds[0])); // todo: getMainReplica könnte ich mir hier sparen wenn ich sicherstelle, dass id 0 immer in der mittleren Kachel ist
 	targetPoint = getMainReplica(targetPoint);
 	const Vector shift = targetPoint - currentPoint;
@@ -46,7 +47,10 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 		do
 		{
 			if (!dt.is_infinite(vc))
+			{
+				assert(0 <= vc->info().id && vc->info().id < sites.size());
 				sites[vc->info().id].becomeStable = false;
+			}
 		} while (++vc != done);
 	}
 	sites[siteId].becomeStable = false;
@@ -83,7 +87,7 @@ void PointSet::coverage(size_t replicaId)
 		if (triangleType(fc) <= 0) // acute or right angled
 		{
 			Point c = dt.circumcenter(fc);
-			double l = length(c - p);
+			const double l = length(c - p);
 			scale[m] = rc / l;
 		}
 		else
@@ -123,7 +127,7 @@ void PointSet::conflict(size_t replicaId)
 	do
 	{
 		Vector edge = vc->point() - p;
-		double l = length(edge);
+		const double l = length(edge);
 		if (l < dMin)
 		{
 			conflict[m] = true;
@@ -215,14 +219,14 @@ std::vector<size_t> PointSet::shuffle(const size_t n)
 	return v;
 }
 
-PointSet::PointSet(int number_of_points, double aspectRatio) :
+PointSet::PointSet(int nPoints, double aspectRatio) :
 #ifdef FIXED_SEED
 	re(12345)
 #else
 	re(std::random_device{}())
 #endif // FIXED_SEED
 {
-	n = number_of_points;                                                     // Number of points in one period
+	n = nPoints;                                                     // Number of points in one period
 	ONE_X = aspectRatio;
 	ONE_Y = 1;
 	HALF_X = 0.5 * ONE_X;
@@ -230,7 +234,7 @@ PointSet::PointSet(int number_of_points, double aspectRatio) :
 	randX = std::uniform_real_distribution<>(0, ONE_X);
 	randY = std::uniform_real_distribution<>(0, ONE_Y);
 	dHex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                           // Maximum packing distance
-	double margin = std::min(10 / sqrt(n), 1.0);                              // Margin for toroidal domain. Heuristically, use 10 layers of points.
+	const double margin = std::min(10 / sqrt(n), 1.0);                              // Margin for toroidal domain. Heuristically, use 10 layers of points.
 	marginBL = Point(-margin * ONE_X, -margin * ONE_Y);                       // Bottom-left of primary period + margin
 	marginTR = Point((1 + margin) * ONE_X, (1 + margin) * ONE_Y);             // Top-right. In our convention BL is included, TR is excluded
 }
@@ -397,6 +401,21 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 #endif
 }
 
+void PointSet::setDMin(double d)
+{
+	rel_dmin = d;
+}
+
+void PointSet::setRc(double r)
+{
+	rel_rc = r;
+}
+
+void PointSet::setSdA(double sd)
+{
+	sdA = sd;
+}
+
 int PointSet::ppo()
 {
 	allStable = false;
@@ -405,6 +424,7 @@ int PointSet::ppo()
 	auto iteration = 1; // todo: consider not counting the last iteration since it is only to check if all are stable
 	for (; iteration <= maxIterations && !allStable; ++iteration)
 	{
+		std::cout << "starting iteration" << iteration << std::endl;
 		for (auto& site : sites) site.becomeStable = true;
 		allStable = true; // Assume the point set will be found stable. (This will be set to false as soon as a point is moved)
 		for (const auto& arrangement : arrangements)
@@ -412,8 +432,8 @@ int PointSet::ppo()
 			auto order = shuffle(arrangement.replicaIdsToIterate.size());
 			for (size_t i = 0; i < arrangement.replicaIdsToIterate.size(); ++i)
 			{
-				auto iRandom = order[i];
-				auto replicaId = arrangement.replicaIdsToIterate[iRandom];
+				const auto iRandom = order[i];
+				const auto replicaId = arrangement.replicaIdsToIterate[iRandom];
 				coverage(replicaId);
 				conflict(replicaId);
 				capacity(replicaId);
@@ -456,4 +476,57 @@ void PointSet::minDistanceCheck()
 		std::cout << "\n";
 	}
 	std::cout.flush();
+}
+
+void PointSet::getPoints(double* outMatrix)
+{
+	if (twoTiles) // points of both point sets are returned in one matrix
+	{
+		auto arrangement = arrangements[0]; // contains ht points of tile 0 by convention
+		auto row = 0;
+		for (auto replicaId : arrangement.replicaIdsToIterate)
+		{
+			Point p = getMainReplica(getPoint(replicaId));
+			//printCoordinates(p);
+			outMatrix[row] = p.x();
+			outMatrix[2 * n + row] = p.y();
+			++row;
+		}
+		arrangement = arrangements[1];
+		for (auto replicaId : arrangement.replicaIdsToIterate)
+		{
+			Point p = getMainReplica(getPoint(replicaId));
+			//printCoordinates(p);
+			outMatrix[row] = p.x();
+			outMatrix[2 * n + row] = p.y();
+			++row;
+		}
+	}
+	else
+	{
+		auto arrangement = arrangements[0]; // contains ht points of tile 0 by convention
+		auto row = 0;
+		for (auto replicaId : arrangement.replicaIdsToIterate)
+		{
+			Point p = getMainReplica(getPoint(replicaId));
+
+			outMatrix[row] = p.x();
+			outMatrix[n + row] = p.y();
+			++row;
+		}
+	}
+}
+
+void PointSet::getPoints(Arrangement& arrangement, std::vector<double>& xOut, std::vector<double>& yOut)
+{
+	xOut.resize(arrangement.replicaIdsToIterate.size());
+	yOut.resize(arrangement.replicaIdsToIterate.size());
+	auto i = 0;
+	for (auto replicaId : arrangement.replicaIdsToIterate)
+	{
+		Point p = getMainReplica(getPoint(replicaId));
+		xOut[i] = p.x();
+		yOut[i] = p.y();
+		i++;
+	}
 }

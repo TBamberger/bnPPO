@@ -40,7 +40,6 @@ class PointSet
 
 	struct Arrangement
 	{
-		//size_t dtId;
 		std::vector<size_t> replicaIdsToIterate;
 	};
 
@@ -66,7 +65,7 @@ class PointSet
 	/// @return: Randomly ordered vector with the integers from 0 to n-1
 	std::vector<size_t> shuffle(const size_t n);
 
-	PointSet(int number_of_points, double aspectRatio);
+	PointSet(int nPoints, double aspectRatio);
 public:
 	// Copying is not allowed since this would invalidate all vertex-, face- and edge-handles when the triangulation is copied
 	PointSet(const PointSet&) = delete;
@@ -75,69 +74,20 @@ public:
 	PointSet(PointSet&&);
 	PointSet& operator=(PointSet&&) = default;
 
-	PointSet(int numberOfPoints, int initType, double aspectRatio); // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid
+	PointSet(int nPoints, int initType, double aspectRatio); // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid
 	PointSet(int nPoints, double* inputPoints, double aspectRatio);
-	PointSet(int nPoints, double* inputPoints, double* inputPointsFixedTile, double aspectRatio);
+	PointSet(int nPoints, double* inputPoints, double* inputPoints2, double aspectRatio);
 
-	void setdmin(double d) { rel_dmin = d; };                                   // Set target NND for spring().
-	void setRc(double r) { rel_rc = r; };
-	void set_sdA(double sd) { sdA = sd; };
+	void setDMin(double d); // Set target NND for spring().
+	void setRc(double r);
+	void setSdA(double sd);
 
 	/// @ return: Iteration count until convergence. -1 if no convergence until the specified maximum iteration.
 	int ppo();
 
 	void minDistanceCheck();
 
-	void PointSet::getPoints(double* outMatrix)
-	{
-		if (twoTiles) // points of both point sets are returned in one matrix
-		{
-			auto arrangement = arrangements[0]; // contains ht points of tile 0 by convention
-			auto row = 0;
-			for (auto replicaId : arrangement.replicaIdsToIterate)
-			{
-				Point p = getMainReplica(getPoint(replicaId));
-				//printCoordinates(p);
-				outMatrix[row] = p.x();
-				outMatrix[2 * n + row] = p.y();
-				++row;
-			}
-			arrangement = arrangements[1];
-			for (auto replicaId : arrangement.replicaIdsToIterate)
-			{
-				Point p = getMainReplica(getPoint(replicaId));
-				//printCoordinates(p);
-				outMatrix[row] = p.x();
-				outMatrix[2 * n + row] = p.y();
-				++row;
-			}
-		}
-		else
-		{
-			auto arrangement = arrangements[0]; // contains ht points of tile 0 by convention
-			auto row = 0;
-			for (auto replicaId : arrangement.replicaIdsToIterate)
-			{
-				Point p = getMainReplica(getPoint(replicaId));
+	void getPoints(double* outMatrix);
 
-				outMatrix[row] = p.x();
-				outMatrix[n + row] = p.y();
-				++row;
-			}
-		}
-	}
-
-	void PointSet::getPoints(Arrangement& arrangement, std::vector<double>& xOut, std::vector<double>& yOut)
-	{
-		xOut.resize(arrangement.replicaIdsToIterate.size());
-		yOut.resize(arrangement.replicaIdsToIterate.size());
-		auto i = 0;
-		for (auto replicaId : arrangement.replicaIdsToIterate)
-		{
-			Point p = getMainReplica(getPoint(replicaId));
-			xOut[i] = p.x();
-			yOut[i] = p.y();
-			i++;
-		}
-	}
+	void getPoints(Arrangement& arrangement, std::vector<double>& xOut, std::vector<double>& yOut);
 };
