@@ -20,7 +20,6 @@ class PointSet
 	double ONE_Y;
 	double HALF_X;
 	double HALF_Y;
-	Point marginBL, marginTR;               // Points within these margins affect points in the main replica
 	bool twoTiles = false;                  // true if two tiles are optimized at once
 
 	int maxIterations = 5000;
@@ -72,12 +71,14 @@ public:
 	PointSet(const PointSet&) = delete;
 	PointSet operator=(const PointSet&) = delete;
 
-	PointSet(PointSet&&);
+	PointSet(PointSet&&) = default;
 	PointSet& operator=(PointSet&&) = default;
 
 	PointSet(int nPoints, int initType, double aspectRatio); // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid
 	PointSet(int nPoints, double* inputPoints, double aspectRatio);
 	PointSet(int nPoints, double* inputPoints, double* inputPoints2, double aspectRatio);
+
+	~PointSet() = default;
 
 	void setDMin(double d); // Set target NND for spring().
 	void setRc(double r);
@@ -93,14 +94,4 @@ public:
 	void getPoints(Arrangement& arrangement, std::vector<double>& xOut, std::vector<double>& yOut);
 
 	[[nodiscard]] bool isInMainReplica(const Point& p) const;
-
-	void printCoordinates(int arrangementId) // todo remove
-	{
-		auto& a = arrangements[arrangementId];
-		for (auto rId : a.replicaIdsToIterate)
-		{
-			auto& p = replicas[rId].vh->point();
-			std::cout << p.x() << ", " << p.y() << std::endl;
-		}
-	}
 };

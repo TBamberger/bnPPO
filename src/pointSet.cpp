@@ -41,6 +41,9 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 		auto& dt = dts[replica.dtId];
 		auto newPosition = replica.vh->point() + shift;
 		replica.vh = dt.move(replica.vh, newPosition);
+		//if (replica.vh->point() == newPosition)
+		//	auto collision = true;
+		//replica.vh = dt.move_if_no_collision(replica.vh, newPosition);
 
 		// Mark neighbors unstable (has to be done for each replica since replicas might be in different triangulations
 		// and therefore have different neighbors).
@@ -239,9 +242,6 @@ PointSet::PointSet(int nPoints, double aspectRatio) :
 	randX = std::uniform_real_distribution<>(0, ONE_X);
 	randY = std::uniform_real_distribution<>(0, ONE_Y);
 	dHex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                           // Maximum packing distance
-	const double margin = std::min(10 / sqrt(n), 1.0);                              // Margin for toroidal domain. Heuristically, use 10 layers of points.
-	marginBL = Point(-margin * ONE_X, -margin * ONE_Y);                       // Bottom-left of primary period + margin
-	marginTR = Point((1 + margin) * ONE_X, (1 + margin) * ONE_Y);             // Top-right. In our convention BL is included, TR is excluded
 }
 
 PointSet::PointSet(int nPoints, int initType, double aspectRatio) : PointSet(nPoints, aspectRatio)
@@ -494,7 +494,7 @@ void PointSet::getPoints(double* outMatrix)
 {
 	if (twoTiles) // points of both point sets are returned in one matrix
 	{
-		auto arrangement = arrangements[0]; // contains ht points of tile 0 by convention
+		auto arrangement = arrangements[0]; // contains the points of tile 0
 		auto row = 0;
 		for (auto replicaId : arrangement.replicaIdsToIterate)
 		{
@@ -516,7 +516,7 @@ void PointSet::getPoints(double* outMatrix)
 	}
 	else
 	{
-		auto arrangement = arrangements[0]; // contains ht points of tile 0 by convention
+		auto arrangement = arrangements[0]; // contains the points of tile 0
 		auto row = 0;
 		for (auto replicaId : arrangement.replicaIdsToIterate)
 		{
