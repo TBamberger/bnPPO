@@ -116,6 +116,7 @@ void testStatistics(const int n)
 
 int main()
 {
-	matlabFailingCase2();
+	const auto iterations = matlabFailingCase2();
+	std::cout << iterations << std::endl;
 	//testStatistics(100);
 }

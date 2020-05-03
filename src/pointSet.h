@@ -22,7 +22,7 @@ class PointSet
 	double HALF_Y;
 	bool twoTiles = false;                  // true if two tiles are optimized at once
 
-	int maxIterations = 5000;
+	int maxIterations = 500;
 
 	struct Replica
 	{
@@ -65,6 +65,9 @@ class PointSet
 	std::vector<size_t> shuffle(const size_t n);
 
 	PointSet(int nPoints, double aspectRatio);
+
+	/// @return: Random vector with the specified length generated with the random engine of the point set
+	Vector randomVector(double vectorLength);
 
 public:
 	// Copying is not allowed since this would invalidate all vertex-, face- and edge-handles when the triangulation is copied

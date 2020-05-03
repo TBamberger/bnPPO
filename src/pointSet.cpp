@@ -35,14 +35,31 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 	const Vector shift = targetPoint - currentPoint;
 	assert(isInMainReplica(currentPoint + shift));
 
+	auto replicaCount = 0;
 	for (auto replicaId : sites[siteId].replicaIds)
 	{
 		auto& replica = replicas[replicaId];
 		auto& dt = dts[replica.dtId];
 		auto newPosition = replica.vh->point() + shift;
+
+		if (replica.vh->point() == newPosition)
+		{
+			// There is already an existing point at the target position, if the point would be inserted there the
+			// points would be fused together since a delaunay triangulation obviously can't deal with multiple points
+			// with identical coordinates.
+			// Therefore a minute offset is added to the target position to keep the points separate. This doesn't
+			// influence the algorithm performance since points with identical position would be pushed apart anyway to
+			// satisfy the conflict radius.
+			if (replicaCount != 0) // if collision isn't detected on the first replica there is a problem with inconsistent tile replicas
+				throw(std::domain_error("Inconsistent tiles detected"));
+			std::cout << "" << std::endl; // todo put into print statistics
+			// todo: keep replica consistent
+			const static double OFFSET_LENGTH = 1e-10;
+			moveSite(siteId, newPosition + randomVector(OFFSET_LENGTH));
+			return;
+		}
+		
 		replica.vh = dt.move(replica.vh, newPosition);
-		//if (replica.vh->point() == newPosition)
-		//	auto collision = true;
 		//replica.vh = dt.move_if_no_collision(replica.vh, newPosition);
 
 		// Mark neighbors unstable (has to be done for each replica since replicas might be in different triangulations
@@ -56,6 +73,7 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 				sites[vc->info().id].becomeStable = false;
 			}
 		} while (++vc != done);
+		++replicaCount;
 	}
 	sites[siteId].becomeStable = false;
 	allStable = false;
@@ -242,6 +260,16 @@ PointSet::PointSet(int nPoints, double aspectRatio) :
 	randX = std::uniform_real_distribution<>(0, ONE_X);
 	randY = std::uniform_real_distribution<>(0, ONE_Y);
 	dHex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                           // Maximum packing distance
+}
+
+Vector PointSet::randomVector(const double vectorLength)
+{
+	// Note that due to the non zero lower bound the random vectors are not perfectly uniformly distributed.
+	// This is not required in this application. If it is desired anyhow one could generate in [0,1) and reject the
+	// zero vector.
+	const static auto randDist = std::uniform_real_distribution<>(0.1, 1);
+	Vector v(randDist(re), randDist(re));
+	return v / length(v) * vectorLength;
 }
 
 PointSet::PointSet(int nPoints, int initType, double aspectRatio) : PointSet(nPoints, aspectRatio)
