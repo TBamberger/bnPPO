@@ -24,6 +24,8 @@ class PointSet
 
 	int maxIterations = 500;
 
+	inline const static double OFFSET_LENGTH = 1e-10; /// If input contains identical points or points are would be moved to the same position, they are moved by this distance to keep points separated.
+
 	struct Replica
 	{
 		VH vh;
@@ -68,6 +70,7 @@ class PointSet
 
 	/// @return: Random vector with the specified length generated with the random engine of the point set
 	Vector randomVector(double vectorLength);
+	VH insertUnique(DT& dt, const Point& p);
 
 public:
 	// Copying is not allowed since this would invalidate all vertex-, face- and edge-handles when the triangulation is copied

@@ -54,7 +54,6 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 				throw(std::domain_error("Inconsistent tiles detected"));
 			std::cout << "" << std::endl; // todo put into print statistics
 			// todo: keep replica consistent
-			const static double OFFSET_LENGTH = 1e-10;
 			moveSite(siteId, newPosition + randomVector(OFFSET_LENGTH));
 			return;
 		}
@@ -272,6 +271,21 @@ Vector PointSet::randomVector(const double vectorLength)
 	return v / length(v) * vectorLength;
 }
 
+VH PointSet::insertUnique(DT& dt, const Point& p)
+{
+	const auto initialVertexCount = dt.number_of_vertices();
+	VH vh = dt.insert(p);
+	while (dt.number_of_vertices() == initialVertexCount)
+	{
+		// If vertex count didn't change, there was an existing point at position p and the vertex handle of the existing
+		// point was returned. To keep points separated, the new point is inserted with a tiny offset next to the
+		// existing point. This doesn't have a significant impact on the result of the algorithm since points with
+		// identical positions will be moved apart from each other to satisfy r_f anyway.
+		vh = dt.insert(p + randomVector(OFFSET_LENGTH));
+	}
+	return vh;
+}
+
 PointSet::PointSet(int nPoints, int initType, double aspectRatio) : PointSet(nPoints, aspectRatio)
 {
 	switch (initType)
@@ -319,7 +333,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : Point
 		{
 			Replica r;
 			const auto replicaId = replicas.size();
-			r.vh = dts[dtId].insert(createReplica(p, j));
+			r.vh = insertUnique(dts[dtId], createReplica(p, j));
 			r.vh->info().id = siteId;
 			r.dtId = dtId;
 			replicas.push_back(r);
@@ -352,7 +366,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 		{
 			Replica r;
 			const auto replicaId = replicas.size();
-			r.vh = dts[dtId].insert(createReplica(p, j));
+			r.vh = insertUnique(dts[dtId], createReplica(p, j));
 			r.vh->info().id = siteId;
 			r.dtId = dtId;
 			replicas.push_back(r);
@@ -368,7 +382,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 		dtId = 2;
 		Replica r;
 		const auto replicaId = replicas.size();
-		r.vh = dts[dtId].insert(createReplica(p, 0)); // 0 is center tile
+		r.vh = insertUnique(dts[dtId], createReplica(p, 0)); // 0 is center tile
 		r.vh->info().id = siteId;
 		r.dtId = dtId;
 		replicas.push_back(r);
@@ -391,7 +405,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 		{
 			Replica r;
 			const auto replicaId = replicas.size();
-			r.vh = dts[dtId].insert(createReplica(p, j));
+			r.vh = insertUnique(dts[dtId], createReplica(p, j));
 			r.vh->info().id = siteId;
 			r.dtId = dtId;
 			replicas.push_back(r);
@@ -408,7 +422,7 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 		{
 			Replica r;
 			const auto replicaId = replicas.size();
-			r.vh = dts[dtId].insert(createReplica(p, j));
+			r.vh = insertUnique(dts[dtId], createReplica(p, j));
 			r.vh->info().id = siteId;
 			r.dtId = dtId;
 			replicas.push_back(r);
