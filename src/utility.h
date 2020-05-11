@@ -13,17 +13,13 @@ using Point = K::Point_2;
 using Vector = K::Vector_2;
 using Points = std::vector<Point>;
 using Vectors = std::vector<Vector>;
-struct VInfo
-{                                                                  // Information stored in vertices in DT.
-	int id;                                                        // Index of point in t-map
-};
-struct FInfo
-{                                                                  // Information stored in faces in DT.
-	Point c;                                                       // Circumcenter, to avoid repeated calculation
+struct VertexInfo
+{
+	int siteId;
 };
 
-using Tvb = CGAL::Triangulation_vertex_base_with_info_2<VInfo, K>;
-using Tfb = CGAL::Triangulation_face_base_with_info_2<FInfo, K>;
+using Tvb = CGAL::Triangulation_vertex_base_with_info_2<VertexInfo, K>;
+using Tfb = CGAL::Triangulation_face_base_2<K>;
 using Tds = CGAL::Triangulation_data_structure_2<Tvb, Tfb>;
 using DT = CGAL::Delaunay_triangulation_2<K, Tds>;
 using VH = DT::Vertex_handle;

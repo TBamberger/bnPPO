@@ -27,10 +27,61 @@ Point PointSet::getMainReplica(const Point& p) const
 	return Point(x, y);
 }
 
+void PointSet::addSite(Point p, std::vector<ReplicaPrototype> replicaPrototypes)
+{
+#ifndef NDEBUG
+	const auto rpWithMaxDtId = std::max_element(replicaPrototypes.begin(), replicaPrototypes.end(), [](const auto& r1, const auto& r2) {return r1.getDtId() < r2.getDtId(); });
+	const auto maxDtId = rpWithMaxDtId->getDtId();
+	assert(maxDtId < dts.size());
+	assert(maxDtId < arrangements.size());
+#endif
+
+	p = getMainReplica(p);
+	Site site;
+	const auto siteId = sites.size();
+
+	// find unique location of p (there is certainly a more efficient method to do this, but this has to do for now due to time constraints)
+	if (!replicaPrototypes.empty())
+	{
+		DT& dt = dts[replicaPrototypes[0].getDtId()];
+		const auto initialVertexCount = dt.number_of_vertices();
+		dt.insert(p); // In case of an existing point nothing is inserted, therefore no need to remove p again; If p doesn't exist it will be inserted later on anyway
+		while (dt.number_of_vertices() == initialVertexCount)
+		{
+			// If vertex count didn't change, there was an existing point at position p and the vertex handle of the existing
+			// point was returned. To keep points separated, the new point is inserted with a tiny offset next to the
+			// existing point. This doesn't have a significant impact on the result of the algorithm since points with
+			// identical positions will be moved apart from each other to satisfy r_f anyway.
+#ifdef PRINT_INFO
+			std::cout << "duplicate input points moved away from each other" << std::endl;
+#endif
+			const Vector offset = randomVector(OFFSET_LENGTH);
+			p = getMainReplica(p + offset); // todo: don't get main replica since this relies on the assumption that replicaPrototypes[0] is the main one
+			dt.insert(p);
+		}
+	}
+	
+	for (auto& rp : replicaPrototypes)
+	{
+		Replica r;
+		const auto replicaId = replicas.size();
+		r.vh = dts[rp.getDtId()].insert(createReplica(p, rp.getReplicaNumber()));
+		r.vh->info().siteId = siteId;
+		r.dtId = rp.getDtId();
+		replicas.push_back(r);
+		site.replicaIds.push_back(replicaId);
+		if (rp.isMainReplica())
+		{
+			arrangements[rp.getDtId()].replicaIdsToIterate.push_back(replicaId);
+		}
+	}
+	sites.push_back(site);
+}
+
 void PointSet::moveSite(size_t siteId, Point targetPoint)
 {
 	assert(0 <= siteId && siteId < sites.size());
-	const auto currentPoint = getMainReplica(getPoint(sites[siteId].replicaIds[0])); // todo: getMainReplica könnte ich mir hier sparen wenn ich sicherstelle, dass id 0 immer in der mittleren Kachel ist
+	const auto currentPoint = getMainReplica(getPoint(sites[siteId].replicaIds[0])); // todo: getMainReplica könnte ich mir hier sparen wenn ich sicherstelle, dass siteId 0 immer in der mittleren Kachel ist
 	targetPoint = getMainReplica(targetPoint);
 	const Vector shift = targetPoint - currentPoint;
 	assert(isInMainReplica(currentPoint + shift));
@@ -42,24 +93,25 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 		auto& dt = dts[replica.dtId];
 		auto newPosition = replica.vh->point() + shift;
 
-		if (replica.vh->point() == newPosition)
-		{
+		// new check for existing point
+		DT::Locate_type locateType;
+		int locateIndex;
+		auto fh = dt.locate(newPosition, locateType, locateIndex);
+		if (locateType == DT::Locate_type::VERTEX)
+		{ // new position coincides with existing vertex
 			// There is already an existing point at the target position, if the point would be inserted there the
 			// points would be fused together since a delaunay triangulation obviously can't deal with multiple points
 			// with identical coordinates.
 			// Therefore a minute offset is added to the target position to keep the points separate. This doesn't
 			// influence the algorithm performance since points with identical position would be pushed apart anyway to
 			// satisfy the conflict radius.
-			if (replicaCount != 0) // if collision isn't detected on the first replica there is a problem with inconsistent tile replicas
-				throw(std::domain_error("Inconsistent tiles detected"));
-			std::cout << "" << std::endl; // todo put into print statistics
-			// todo: keep replica consistent
+#ifdef PRINT_INFO
+			std::cout << "move to existing position avoided" << std::endl;
+#endif //PRINT_INFO
 			moveSite(siteId, newPosition + randomVector(OFFSET_LENGTH));
 			return;
 		}
-		
 		replica.vh = dt.move(replica.vh, newPosition);
-		//replica.vh = dt.move_if_no_collision(replica.vh, newPosition);
 
 		// Mark neighbors unstable (has to be done for each replica since replicas might be in different triangulations
 		// and therefore have different neighbors).
@@ -68,8 +120,8 @@ void PointSet::moveSite(size_t siteId, Point targetPoint)
 		{
 			if (!dt.is_infinite(vc))
 			{
-				assert(0 <= vc->info().id && vc->info().id < sites.size());
-				sites[vc->info().id].becomeStable = false;
+				assert(0 <= vc->info().siteId && vc->info().siteId < sites.size());
+				sites[vc->info().siteId].becomeStable = false;
 			}
 		} while (++vc != done);
 		++replicaCount;
@@ -104,7 +156,7 @@ void PointSet::coverage(size_t replicaId)
 	{
 		++vc;
 		edge[m] = p - vc->point();
-		id[m] = vc->info().id;
+		id[m] = vc->info().siteId;
 		if (triangleType(fc) <= 0) // acute or right angled
 		{
 			Point c = dt.circumcenter(fc);
@@ -141,7 +193,7 @@ void PointSet::conflict(size_t replicaId)
 	std::vector<bool> conflict(vhDegree);
 	std::vector<Vector> shift(vhDegree);
 	std::vector<int> id(vhDegree);
-	
+
 	int m = 0;
 	VC vc = dt.incident_vertices(replica.vh);
 	const VC done(vc);
@@ -153,7 +205,7 @@ void PointSet::conflict(size_t replicaId)
 		{
 			conflict[m] = true;
 			shift[m] = (1.001 * dMin / l - 1) * edge;
-			id[m] = vc->info().id;
+			id[m] = vc->info().siteId;
 		}
 		else
 		{
@@ -192,7 +244,7 @@ void PointSet::capacity(size_t replicaId)
 		dir[m] = (vc->point() - p);
 		d[m] = length(dir[m]);
 		dir[m] = dir[m] / d[m];                                       // Normalize direction vector
-		id[m] = vc->info().id;
+		id[m] = vc->info().siteId;
 		++fc1;
 		++fc2;
 		++m;
@@ -240,25 +292,25 @@ std::vector<size_t> PointSet::shuffle(const size_t n)
 	return v;
 }
 
-PointSet::PointSet(int nPoints, double aspectRatio) :
+PointSet::PointSet(const int nPoints, const double aspectRatio) :
 #ifdef FIXED_SEED
 	re(12345)
 #else
 	re(std::random_device{}())
 #endif // FIXED_SEED
+	, n(nPoints)
 {
 	if (nPoints < 2)
 	{
 		throw std::invalid_argument("Can't work on less than two points.");
 	}
-	n = nPoints;                                                     // Number of points in one period
 	ONE_X = aspectRatio;
 	ONE_Y = 1;
 	HALF_X = 0.5 * ONE_X;
 	HALF_Y = 0.5 * ONE_Y;
 	randX = std::uniform_real_distribution<>(0, ONE_X);
 	randY = std::uniform_real_distribution<>(0, ONE_Y);
-	dHex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * n));                           // Maximum packing distance
+	dHex = sqrt(ONE_X * ONE_Y * 2 / (sqrt(3) * nPoints)); // Maximum packing distance
 }
 
 Vector PointSet::randomVector(const double vectorLength)
@@ -271,19 +323,28 @@ Vector PointSet::randomVector(const double vectorLength)
 	return v / length(v) * vectorLength;
 }
 
-VH PointSet::insertUnique(DT& dt, const Point& p)
+bool PointSet::isValid(const Site& site) const
 {
-	const auto initialVertexCount = dt.number_of_vertices();
-	VH vh = dt.insert(p);
-	while (dt.number_of_vertices() == initialVertexCount)
+	if (site.replicaIds.empty())
+		return false;
+
+	// Check if all replicas of the site have the same main replica
+	const auto expectedMainReplica = getMainReplica(replicas[site.replicaIds[0]].vh->point());
+	for (auto replicaId : site.replicaIds)
 	{
-		// If vertex count didn't change, there was an existing point at position p and the vertex handle of the existing
-		// point was returned. To keep points separated, the new point is inserted with a tiny offset next to the
-		// existing point. This doesn't have a significant impact on the result of the algorithm since points with
-		// identical positions will be moved apart from each other to satisfy r_f anyway.
-		vh = dt.insert(p + randomVector(OFFSET_LENGTH));
+		auto mainReplica = getMainReplica(replicas[replicaId].vh->point());
+		if (length(expectedMainReplica - mainReplica) > 1e-10) // points aren't considered identical anymore
+		{
+			std::cout << "Found invalid site with the following main replicas of the points:\n";
+			for (auto replicaId : site.replicaIds)
+			{
+				printCoordinates(getMainReplica(replicas[replicaId].vh->point()));
+			}
+			return false;
+		}
 	}
-	return vh;
+	
+	return true;
 }
 
 PointSet::PointSet(int nPoints, int initType, double aspectRatio) : PointSet(nPoints, aspectRatio)
@@ -321,29 +382,16 @@ PointSet::PointSet(int nPoints, double* inputPoints, double aspectRatio) : Point
 	dts.resize(1);
 	arrangements.resize(1);
 
-	const auto dtId = 0;
+	std::vector<ReplicaPrototype> replicaPrototypesTile;
+	size_t dtId = 0;
+	for (short replicaNumber = 0; replicaNumber < 9; ++replicaNumber) // tile1 replicated nine times in arrangement 0 to work on toroidal domain
+	{
+		replicaPrototypesTile.emplace_back(replicaNumber, dtId);
+	}
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints[i], inputPoints[i + n]);
-		p = getMainReplica(p);
-
-		Site site;
-		const auto siteId = sites.size();
-		for (auto j = 0; j < 9; ++j)
-		{
-			Replica r;
-			const auto replicaId = replicas.size();
-			r.vh = insertUnique(dts[dtId], createReplica(p, j));
-			r.vh->info().id = siteId;
-			r.dtId = dtId;
-			replicas.push_back(r);
-			site.replicaIds.push_back(replicaId);
-			if (j == 0) // replicas in center tile
-			{
-				arrangements[dtId].replicaIdsToIterate.push_back(replicaId);
-			}
-		}
-		sites.push_back(site);
+		addSite(p, replicaPrototypesTile);
 	}
 }
 
@@ -353,89 +401,42 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 	dts.resize(3);
 	arrangements.resize(3);
 
+	std::vector<ReplicaPrototype> replicaPrototypesTile1;
+	size_t dtId = 0;
+	for (short replicaNumber = 0; replicaNumber < 9; ++replicaNumber) // tile1 replicated nine times in arrangement 0 to work on toroidal domain
+	{
+		replicaPrototypesTile1.emplace_back(replicaNumber, dtId);
+	}
+	dtId = 2;
+	replicaPrototypesTile1.emplace_back(0, dtId); // tile1 in the center of arrangement 2 to enforce properties on tile1/tile2 border (0 is center tile)
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints[i], inputPoints[i + n]);
-		p = getMainReplica(p);
-		Site site;
-		const auto siteId = sites.size();
-
-		// tile1 replicated nine times in arrangement 0 to work on toroidal domain
-		auto dtId = 0;
-		for (auto j = 0; j < 9; ++j)
-		{
-			Replica r;
-			const auto replicaId = replicas.size();
-			r.vh = insertUnique(dts[dtId], createReplica(p, j));
-			r.vh->info().id = siteId;
-			r.dtId = dtId;
-			replicas.push_back(r);
-			
-			site.replicaIds.push_back(replicaId);
-			if (j == 0) // replicas in center tile
-			{
-				arrangements[dtId].replicaIdsToIterate.push_back(replicaId);
-			}
-		}
-
-		// tile1 in the center of arrangement 2 to enforce properties on tile1/tile2 border
-		dtId = 2;
-		Replica r;
-		const auto replicaId = replicas.size();
-		r.vh = insertUnique(dts[dtId], createReplica(p, 0)); // 0 is center tile
-		r.vh->info().id = siteId;
-		r.dtId = dtId;
-		replicas.push_back(r);
-		site.replicaIds.push_back(replicaId);
-		arrangements[dtId].replicaIdsToIterate.push_back(replicaId);
-
-		sites.push_back(site);
+		addSite(p, replicaPrototypesTile1);
 	}
 
+	std::vector<ReplicaPrototype> replicaPrototypesTile2;
+	dtId = 1;
+	for (short replicaNumber = 0; replicaNumber < 9; ++replicaNumber) // tile2 replicated nine times in arrangement 1 to work on toroidal domain
+	{
+		replicaPrototypesTile2.emplace_back(replicaNumber, dtId);
+	}
+	dtId = 2;
+	for (short replicaNumber = 1; replicaNumber < 9; ++replicaNumber) // tile2 in the eight outer tiles of arrangement 2 to enforce properties on tile1/tile2 border (1-8 are the outer tiles)
+	{
+		replicaPrototypesTile2.emplace_back(replicaNumber, dtId);
+	}
 	for (auto i = 0; i < n; ++i)
 	{
 		Point p(inputPoints2[i], inputPoints2[i + n]);
-		p = getMainReplica(p);
-		Site site;
-		const auto siteId = sites.size();
-
-		// tile2 replicated nine times in arrangement 1 to work on toroidal domain
-		auto dtId = 1;
-		for (auto j = 0; j < 9; ++j)
-		{
-			Replica r;
-			const auto replicaId = replicas.size();
-			r.vh = insertUnique(dts[dtId], createReplica(p, j));
-			r.vh->info().id = siteId;
-			r.dtId = dtId;
-			replicas.push_back(r);
-			site.replicaIds.push_back(replicaId);
-			if (j == 0) // replicas in center tile
-			{
-				arrangements[dtId].replicaIdsToIterate.push_back(replicaId);
-			}
-		}
-
-		// tile2 in the eight outer tiles of arrangement 2 to enforce properties on tile1/tile2 border
-		dtId = 2;
-		for (auto j = 1; j < 9; ++j) // 1-8 are the outer tiles
-		{
-			Replica r;
-			const auto replicaId = replicas.size();
-			r.vh = insertUnique(dts[dtId], createReplica(p, j));
-			r.vh->info().id = siteId;
-			r.dtId = dtId;
-			replicas.push_back(r);
-			site.replicaIds.push_back(replicaId);
-		}
-
-		sites.push_back(site);
+		addSite(p, replicaPrototypesTile2);
 	}
 
 	assert(replicas.size() == 3 * 9 * nPoints);
 	assert(arrangements.size() == 3);
 	assert(sites.size() == 2 * nPoints);
 #ifndef NDEBUG
+	// Check if size of data structures is as expected
 	auto nSeventeenReplicas = 0; // sites that have nine replicas in the first and eight in the last arrangement
 	auto nTenReplicas = 0; // sites that have nine replicas in the first and one in the last arrangement
 	for (auto& site : sites)
@@ -449,6 +450,31 @@ PointSet::PointSet(int nPoints, double* inputPoints, double* inputPoints2, doubl
 	}
 	assert(nSeventeenReplicas == nPoints);
 	assert(nTenReplicas == nPoints);
+
+	// Check if the points of all replicas have valid site ids
+	for (auto& r : replicas)
+	{
+		auto siteId = r.vh->info().siteId;
+		assert(0 <= siteId && siteId < sites.size());
+	}
+
+	// Check if all points in any of the dts have valid site ids
+	for (auto& dt : dts)
+	{
+		for (auto vh = dt.finite_vertices_begin(); vh != dt.finite_vertices_end(); ++vh)
+		{
+			auto siteId = vh->info().siteId;
+			assert(0 <= siteId && siteId < sites.size());
+		}
+	}
+
+	// Check for all sites if the replicas have the same mainReplica
+	for (auto i = 0; i < sites.size(); ++i)
+	{
+		//assert(isValid(sites[i]));
+		isValid(sites[i]);
+	}
+	
 #endif //NDEBUG
 }
 
@@ -469,10 +495,11 @@ void PointSet::setSdA(double sd)
 
 int PointSet::ppo()
 {
+	auto iteration = 1; // todo: consider not counting the last iteration since it is only to check if all are stable
+
 	allStable = false;
 	for (auto& site : sites) site.isStable = false;
 
-	auto iteration = 1; // todo: consider not counting the last iteration since it is only to check if all are stable
 	for (; iteration <= maxIterations && !allStable; ++iteration)
 	{
 #ifdef PRINT_INFO
@@ -487,7 +514,7 @@ int PointSet::ppo()
 			{
 				const auto iRandom = order[i];
 				const auto replicaId = arrangement.replicaIdsToIterate[iRandom];
-				
+
 				coverage(replicaId);
 				conflict(replicaId);
 				capacity(replicaId);

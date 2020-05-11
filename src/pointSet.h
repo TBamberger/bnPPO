@@ -24,12 +24,29 @@ class PointSet
 
 	int maxIterations = 500;
 
-	inline const static double OFFSET_LENGTH = 1e-10; /// If input contains identical points or points are would be moved to the same position, they are moved by this distance to keep points separated.
+	/// If input contains identical points or points are would be moved to the same position, they are moved by this distance to keep points separated.
+	inline const static double OFFSET_LENGTH = 1e-10;
 
 	struct Replica
 	{
 		VH vh;
 		size_t dtId = -1;
+	};
+
+	class ReplicaPrototype
+	{
+		short replicaNumber;
+		size_t dtId;
+	public:
+		ReplicaPrototype(const short replicaNumber, const size_t dtId) : replicaNumber(replicaNumber), dtId(dtId)
+		{
+			if (replicaNumber < 0 || replicaNumber > 9)
+				throw(std::invalid_argument("ReplicaNumber must be an integer between (including) 0 and 9."));
+		}
+
+		[[nodiscard]] short getReplicaNumber() const { return replicaNumber; }
+		[[nodiscard]] size_t getDtId() const { return dtId; }
+		[[nodiscard]] bool isMainReplica() const { return replicaNumber == 0; }
 	};
 
 	struct Site
@@ -52,8 +69,9 @@ class PointSet
 	Point& getPoint(size_t replicaId);
 
 	/// @return: The point in the center tile
-	Point getMainReplica(const Point& p) const;
+	[[nodiscard]] Point getMainReplica(const Point& p) const;
 
+	void addSite(Point p, std::vector<ReplicaPrototype> replicaPrototypes);
 	void moveSite(size_t siteId, Point targetPoint);
 	void moveSite(size_t siteId, Vector shift);
 
@@ -64,13 +82,15 @@ class PointSet
 	Point createReplica(Point& p, int i) const;
 
 	/// @return: Randomly ordered vector with the integers from 0 to n-1
-	std::vector<size_t> shuffle(const size_t n);
+	std::vector<size_t> shuffle(size_t n);
 
 	PointSet(int nPoints, double aspectRatio);
 
 	/// @return: Random vector with the specified length generated with the random engine of the point set
 	Vector randomVector(double vectorLength);
-	VH insertUnique(DT& dt, const Point& p);
+
+	/// Checks if all replicas of the site have the same main replica. Only necessary for debugging / testing.
+	[[nodiscard]] bool isValid(const Site& site) const;
 
 public:
 	// Copying is not allowed since this would invalidate all vertex-, face- and edge-handles when the triangulation is copied
@@ -80,13 +100,13 @@ public:
 	PointSet(PointSet&&) = default;
 	PointSet& operator=(PointSet&&) = default;
 
-	PointSet(int nPoints, int initType, double aspectRatio); // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid
+	PointSet(int nPoints, int initType, double aspectRatio); // initType:   0: random, 1: darts, 2: jittered grid, 3: regular grid // todo: use enum instead
 	PointSet(int nPoints, double* inputPoints, double aspectRatio);
 	PointSet(int nPoints, double* inputPoints, double* inputPoints2, double aspectRatio);
 
 	~PointSet() = default;
 
-	void setDMin(double d); // Set target NND for spring().
+	void setDMin(double d);
 	void setRc(double r);
 	void setSdA(double sd);
 
